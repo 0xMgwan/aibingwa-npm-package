@@ -81,7 +81,15 @@ Built to be imported into any Node.js project — Telegram bots, Discord bots, w
 
 ---
 
-## Quick Start
+## Getting Started
+
+### Prerequisites
+
+You'll need:
+- **Node.js** >= 20.0.0
+- **OpenAI API key** — Get one at https://platform.openai.com/api-keys
+- **Bankr API key** OR **x402 wallet with USDC on Base** — See setup below
+- **Base blockchain wallet** — For trading and x402 payments
 
 ### Installation
 
@@ -92,12 +100,84 @@ npm install aibingwa-agent
 Or clone and link locally:
 
 ```bash
-git clone https://github.com/0xMgwan/aibingwa-package.git
-cd aibingwa-package
+git clone https://github.com/0xMgwan/aibingwa-npm-package.git
+cd aibingwa-npm-package
 npm install
 npm run build
 npm link
 ```
+
+### Wallet Setup for Bankr
+
+You have **two options**:
+
+#### **Option A: API Key Mode (Recommended for Beginners)**
+
+1. Get a Bankr API key from https://bankr.bot
+2. Set environment variable:
+   ```bash
+   export BANKR_API_KEY="your_bankr_api_key_here"
+   ```
+3. Done! No wallet needed for basic operations.
+
+#### **Option B: x402 Micropayments (Self-Sustaining)**
+
+This allows the agent to pay for API calls using USDC on Base, enabling true self-sustainability.
+
+**Step 1: Create a Base Wallet**
+
+Using `viem` CLI:
+```bash
+# Install viem globally
+npm install -g viem
+
+# Generate a new wallet
+viem account create
+
+# Output:
+# Address: 0x1234...
+# Private Key: 0xabcd...
+```
+
+Or use an existing wallet (MetaMask, Coinbase Wallet, etc.) and export the private key.
+
+**Step 2: Fund Your Wallet with USDC on Base**
+
+1. Get Base testnet ETH from a faucet: https://faucet.circle.com/
+2. Bridge USDC to Base: https://bridge.base.org/
+3. Or use a CEX (Coinbase, Kraken) to send USDC directly to Base
+
+Minimum: ~$5 USDC to start trading
+
+**Step 3: Set Environment Variables**
+
+```bash
+export X402_PRIVATE_KEY="0xyour_private_key_here"
+export X402_WALLET_ADDRESS="0xyour_wallet_address_here"  # Optional, auto-derived if not set
+```
+
+#### **Option C: Coinbase AgentKit (Enterprise)**
+
+For production agents, use Coinbase's AgentKit for managed wallets:
+
+```typescript
+import { CoinbaseWalletSDK } from "@coinbase/wallet-sdk";
+import { AgentBingwa } from "aibingwa-agent";
+
+// Coinbase handles wallet creation & security
+const wallet = new CoinbaseWalletSDK({
+  appName: "AIBINGWA",
+  appLogoUrl: "https://...",
+});
+
+const agent = new AgentBingwa({
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  bankrApiKey: process.env.BANKR_API_KEY,
+  x402PrivateKey: wallet.getPrivateKey(),  // Secure key management
+});
+```
+
+### Quick Start
 
 ### Minimal Example
 
@@ -238,17 +318,26 @@ AgentBingwa (index.ts)
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | **Yes** | OpenAI API key for GPT-4o reasoning |
-| `BANKR_API_KEY` | Recommended | Bankr Agent API key for DeFi operations |
-| `X402_PRIVATE_KEY` | Optional | Private key for x402 micropayment wallet |
-| `X402_WALLET_ADDRESS` | Optional | Wallet address (auto-derived if not set) |
-| `WALLET_PRIVATE_KEY` | Optional | Fallback private key for x402 |
-| `X_CONSUMER_KEY` | Optional | Twitter/X OAuth consumer key |
-| `X_CONSUMER_SECRET` | Optional | Twitter/X OAuth consumer secret |
-| `X_ACCESS_TOKEN` | Optional | Twitter/X OAuth access token |
-| `X_ACCESS_TOKEN_SECRET` | Optional | Twitter/X OAuth access token secret |
+#### **Required**
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key for GPT-4o reasoning. Get from https://platform.openai.com/api-keys |
+
+#### **DeFi Operations (Choose One)**
+| Variable | Description |
+|----------|-------------|
+| `BANKR_API_KEY` | **API Key Mode** — Bankr Agent API key. Get from https://bankr.bot. No wallet needed. |
+| `X402_PRIVATE_KEY` | **x402 Mode** — Private key for Base wallet (0x...). See [Wallet Setup](#wallet-setup-for-bankr) for instructions. Requires USDC on Base. |
+
+#### **Optional**
+| Variable | Description |
+|----------|-------------|
+| `X402_WALLET_ADDRESS` | Wallet address for x402 (auto-derived from private key if not set) |
+| `WALLET_PRIVATE_KEY` | Fallback private key for x402 if `X402_PRIVATE_KEY` not set |
+| `X_CONSUMER_KEY` | Twitter/X OAuth consumer key (requires Basic tier, $100/mo) |
+| `X_CONSUMER_SECRET` | Twitter/X OAuth consumer secret |
+| `X_ACCESS_TOKEN` | Twitter/X OAuth access token |
+| `X_ACCESS_TOKEN_SECRET` | Twitter/X OAuth access token secret |
 
 ### Trading Settings (Environment Variables)
 
