@@ -31,6 +31,7 @@ import { setDataDir } from "./memory.js";
 import { AutonomousTrader, type BankrPromptFn } from "./autonomous.js";
 import { BankrX402Client } from "./bankr-x402.js";
 import { TwitterClient } from "./twitter.js";
+import { registerAllSkills, type SkillDeps } from "./register-skills.js";
 
 // ============================================================
 // CONVENIENCE: AgentBingwa — All-in-one agent setup
@@ -132,6 +133,25 @@ export class AgentBingwa {
     console.log(`   Twitter: ${this.twitterClient?.isAvailable() ? "✅" : "❌"}`);
   }
 
+  // ── INITIALIZE WITH ALL SKILLS ──────────────────────────
+  /**
+   * Initialize the agent with all 50+ built-in skills.
+   * Call this once at startup to register Bankr, trading, research, leverage, NFT, x402, Twitter skills.
+   * Requires: bankrPrompt function, isBankrConfigured function, and optional dependencies.
+   */
+  initializeWithAllSkills(deps?: Partial<SkillDeps>): void {
+    const fullDeps: SkillDeps = {
+      bankrPrompt: this.getBankrPrompt(),
+      isBankrConfigured: () => !!this.bankrApiKey,
+      x402Client: this.x402Client || undefined,
+      twitterClient: this.twitterClient || undefined,
+      ...deps,
+    };
+
+    registerAllSkills(this.skills, fullDeps);
+    console.log(`✅ Initialized with ${this.skills.getAll().length} skills`);
+  }
+
   // ── PROCESS MESSAGE ──────────────────────────────────────
   async processMessage(
     chatId: string,
@@ -191,44 +211,50 @@ export class AgentBingwa {
         const body: any = { prompt };
         if (threadId) body.threadId = threadId;
 
-        const res = await fetch("https://api.bankr.bot/v2/prompt", {
+        const res = await fetch("https://api.bankr.bot/agent/prompt", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": apiKey,
+            "X-API-Key": apiKey,
           },
           body: JSON.stringify(body),
         });
 
         if (!res.ok) {
-          return { success: false, jobId: "", status: "failed", error: `API error: ${res.status}` };
+          const errText = await res.text();
+          return { success: false, jobId: "", status: "failed", error: `Bankr API error: ${res.status} ${errText}` };
         }
 
         const data = await res.json() as any;
         const jobId = data.jobId;
+        const resultThreadId = data.threadId;
 
         if (!jobId) {
-          return { success: false, jobId: "", status: "failed", error: "No job ID" };
+          return { success: false, jobId: "", status: "failed", error: "No job ID returned from Bankr" };
         }
 
-        // Poll for results
-        for (let i = 0; i < 45; i++) {
+        // Poll for results (max 120s)
+        for (let i = 0; i < 60; i++) {
           await new Promise(r => setTimeout(r, 2000));
 
-          const pollRes = await fetch(`https://api.bankr.bot/v2/job/${jobId}`, {
-            headers: { "x-api-key": apiKey },
+          const pollRes = await fetch(`https://api.bankr.bot/agent/job/${jobId}`, {
+            headers: { "X-API-Key": apiKey },
           });
 
           if (!pollRes.ok) continue;
           const pollData = await pollRes.json() as any;
 
           if (pollData.status === "completed") {
+            if (pollData.transactions && pollData.transactions.length > 0) {
+              console.log(`📋 Bankr returned ${pollData.transactions.length} transaction(s) for job ${jobId}`);
+            }
             return {
               success: true,
               jobId,
-              threadId: pollData.threadId,
+              threadId: resultThreadId,
               status: "completed",
-              response: pollData.response,
+              response: pollData.response || "No response",
+              transactions: pollData.transactions || [],
             };
           }
 
@@ -242,7 +268,7 @@ export class AgentBingwa {
           }
         }
 
-        return { success: false, jobId, status: "timeout", error: "Request timed out" };
+        return { success: false, jobId, status: "timeout", error: "Request timed out (120s)" };
       } catch (err: any) {
         return { success: false, jobId: "", status: "failed", error: err.message };
       }

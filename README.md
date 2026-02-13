@@ -355,6 +355,48 @@ It includes:
 
 ---
 
+### Using Built-in Skills (registerAllSkills)
+
+Register all 50+ pre-built skills in your own project:
+
+```typescript
+import {
+  AgentBingwa,
+  registerAllSkills,
+  SkillDeps,
+} from "aibingwa-agent";
+
+const agent = new AgentBingwa({
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  bankrApiKey: process.env.BANKR_API_KEY,
+});
+
+// Register all 50+ built-in skills
+const deps: SkillDeps = {
+  bankrPrompt: agent.getBankrPrompt(),
+  isBankrConfigured: () => !!process.env.BANKR_API_KEY,
+  // ... other optional dependencies (see SkillDeps interface)
+};
+
+registerAllSkills(agent.skills, deps);
+
+// Now the agent has all skills: trading, research, leverage, NFT, x402, Twitter, etc.
+console.log(`Registered ${agent.getSkillCount()} skills`);
+```
+
+**Skills included:**
+- **Wallet:** Get balance, check all tokens, Bankr balance
+- **Trading:** Swap, send, snipe, sell, wrap/unwrap
+- **Research:** Token price, research, trending, low-cap gems, technical analysis, sentiment
+- **Leverage:** Open/close positions, view positions (Avantis)
+- **Automation:** Limit orders, stop loss, DCA, TWAP, view/cancel automations
+- **NFT:** Browse, buy, portfolio
+- **Token Deploy:** Deploy on Base (ERC-20) or Solana (SPL), claim fees
+- **Cross-Chain:** Bridge tokens, multi-chain portfolio
+- **Prediction:** Polymarket query, bet, positions
+- **Social:** Tweet, trade alerts, daily reports, gem finds
+- **x402:** x402 prompt, revenue report, set budget, track revenue
+
 ### Using Individual Modules
 
 You don't have to use the all-in-one `AgentBingwa` class. Import only what you need:
