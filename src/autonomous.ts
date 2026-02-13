@@ -381,11 +381,18 @@ export class AutonomousTrader {
       const stats = this.memory.polymarketStats || { totalBets: 0, wins: 0, losses: 0, totalPnl: 0 };
       const recentLearnings = (this.memory.polymarketLearnings || []).slice(-5).join("\n");
       
+      // Extract budget from strategy if mentioned (e.g., "$40 wallet")
+      const budgetMatch = this.polymarketStrategy.match(/\$(\d+)/);
+      const totalBudget = budgetMatch ? parseInt(budgetMatch[1]) : 100;
+      const perTradeAmount = Math.max(1, Math.floor(totalBudget / 10)); // Divide budget into ~10 trades
+      
       console.log("🎯 Autonomous Polymarket scan: executing strategy...");
+      console.log(`   Budget: $${totalBudget} | Per-trade amount: $${perTradeAmount}`);
 
       const scanResult = await this.bankrPrompt(
         `You are executing a continuous Polymarket trading strategy.\n\n` +
         `STRATEGY: ${this.polymarketStrategy}\n\n` +
+        `BUDGET: You have $${totalBudget} total. Bet $${perTradeAmount} per trade to manage risk.\n\n` +
         `PAST PERFORMANCE:\n` +
         `- Total bets: ${stats.totalBets} | Wins: ${stats.wins} | Losses: ${stats.losses}\n` +
         `- P&L: $${stats.totalPnl.toFixed(2)}\n` +
@@ -393,9 +400,9 @@ export class AutonomousTrader {
         `INSTRUCTIONS:\n` +
         `1. Search for matching markets based on the strategy\n` +
         `2. Analyze odds and pick the best opportunity\n` +
-        `3. PLACE THE BET immediately — do NOT just describe what you would do\n` +
+        `3. PLACE THE BET IMMEDIATELY for $${perTradeAmount} — do NOT ask for confirmation or amount\n` +
         `4. If past bets lost, ADAPT your approach (e.g. switch sides, pick different markets)\n` +
-        `5. Report: what market, what side, how much, and why`
+        `5. Report: what market, what side, $${perTradeAmount} bet, and why`
       );
 
       if (!scanResult.success) {
