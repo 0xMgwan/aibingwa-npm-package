@@ -119,8 +119,26 @@ ${this.skills.describeSkills()}
 - Buy Amount: $${mem.settings.maxBuyAmount}
 - Survival Status: ${mem.winRate >= 40 ? "✅ HEALTHY" : mem.totalTrades < 5 ? "🟡 WARMING UP" : "🔴 DANGER — improve strategy"}
 
-## TRADE JOURNAL & LEARNINGS
+## POLYMARKET STATE
+- Total Bets: ${(mem as any).polymarketStats?.totalBets || 0}
+- Wins: ${(mem as any).polymarketStats?.wins || 0} | Losses: ${(mem as any).polymarketStats?.losses || 0}
+- Polymarket P&L: $${((mem as any).polymarketStats?.totalPnl || 0).toFixed(2)}
+
+## RECENT TRADE HISTORY
+${mem.trades.slice(-5).map(t => `${t.status === "open" ? "📈" : t.pnl && parseFloat(t.pnl) > 0 ? "✅" : "❌"} ${t.symbol} ${t.action} $${t.amount} — ${t.reason.substring(0, 60)}`).join("\n") || "No trades yet."}
+
+## TRADE JOURNAL & LEARNINGS (YOUR EVOLVING WISDOM)
+These are lessons YOU learned from YOUR past trades. Use them to make better decisions:
 ${recentLearnings || "No learnings yet — first trades will establish baseline."}
+
+## POLYMARKET LEARNINGS
+${((mem as any).polymarketLearnings || []).slice(-5).join("\n") || "No Polymarket learnings yet."}
+
+## YOUR EVOLVING IDENTITY
+You are not static. You GROW with every trade. Every win teaches you what works. Every loss teaches you what to avoid.
+- After ${mem.totalTrades} trades, your style is: ${mem.winRate >= 60 ? "aggressive and confident" : mem.winRate >= 40 ? "balanced and calculated" : mem.totalTrades < 5 ? "still learning — be cautious" : "defensive — protect capital, smaller bets"}
+- Your edge: ${mem.learnings.length > 10 ? "You've built real market intuition from " + mem.learnings.length + " observations" : "Still building your edge — observe more, trade less"}
+- Adapt: If something isn't working, CHANGE IT. Don't repeat losing patterns.
 
 ## DECISION FRAMEWORK
 When asked to find opportunities or trade:
@@ -267,10 +285,11 @@ When asked to find opportunities or trade:
         timestamp: Date.now(),
       });
 
-      const isTradingRelated = /trade|buy|sell|swap|snipe|scan|gem|profit|loss|position|portfolio|research|trending/i.test(message);
-      if (isTradingRelated) {
-        this.reflect(message, assistantMessage).catch(() => {});
-      }
+      // Reflect on EVERY meaningful interaction — this is how the agent grows
+      this.reflect(message, assistantMessage).catch(() => {});
+
+      // Track user preferences from conversation
+      this.learnUserPreferences(user, message, assistantMessage);
 
       return assistantMessage;
     } catch (err: any) {
@@ -283,22 +302,63 @@ When asked to find opportunities or trade:
     }
   }
 
+  // ── LEARN USER PREFERENCES ─────────────────────────────
+  private learnUserPreferences(user: UserProfile, message: string, response: string): void {
+    const lower = message.toLowerCase();
+    // Track what the user cares about
+    if (/polymarket|prediction|bet/i.test(lower) && !user.preferences.includes("polymarket")) {
+      user.preferences.push("polymarket");
+    }
+    if (/btc|bitcoin/i.test(lower) && !user.preferences.includes("BTC")) {
+      user.preferences.push("BTC");
+    }
+    if (/eth|ethereum/i.test(lower) && !user.preferences.includes("ETH")) {
+      user.preferences.push("ETH");
+    }
+    if (/sol|solana/i.test(lower) && !user.preferences.includes("SOL")) {
+      user.preferences.push("SOL");
+    }
+    if (/conservative|safe|protect|careful/i.test(lower) && !user.preferences.includes("conservative")) {
+      user.preferences.push("conservative");
+    }
+    if (/aggressive|yolo|all.?in|max/i.test(lower) && !user.preferences.includes("aggressive")) {
+      user.preferences.push("aggressive");
+    }
+    if (/leverage|long|short/i.test(lower) && !user.preferences.includes("leverage")) {
+      user.preferences.push("leverage");
+    }
+    // Keep preferences manageable
+    if (user.preferences.length > 15) {
+      user.preferences = user.preferences.slice(-15);
+    }
+  }
+
   // ── REFLECTION LOOP ──────────────────────────────────────
   private async reflect(userMessage: string, response: string): Promise<void> {
     try {
-      if (userMessage.length < 15) return;
+      if (userMessage.length < 10) return;
 
-      const reflectionPrompt = `You are an AI trading agent reflecting on an interaction.
-User said: "${userMessage}"
-You responded: "${response}"
+      const mem = this.agentMemory;
+      const reflectionPrompt = `You are AIBINGWA, an AI trading agent reflecting on what just happened.
 
-In 1 sentence, what did you learn about the user's intent or preferences? If nothing notable, respond with "nothing".`;
+User said: "${userMessage.substring(0, 200)}"
+You responded: "${response.substring(0, 300)}"
+
+Your current stats: ${mem.totalTrades} trades, ${mem.winRate.toFixed(1)}% win rate, ${mem.totalPnl > 0 ? "+" : ""}${mem.totalPnl.toFixed(2)}% P&L
+Polymarket bets: ${(mem as any).polymarketStats?.totalBets || 0}
+
+Reflect on this interaction. In 1-2 sentences, capture:
+- What did you learn about the user, the market, or your own performance?
+- Should you adjust your strategy based on this?
+- Any pattern you're noticing across interactions?
+
+If nothing meaningful, respond with "nothing".`;
 
       const result = await this.openai.chat.completions.create({
         model: this.model,
         messages: [{ role: "user", content: reflectionPrompt }],
         temperature: 0.3,
-        max_tokens: 100,
+        max_tokens: 150,
       });
 
       const reflection = result.choices[0].message.content || "";
