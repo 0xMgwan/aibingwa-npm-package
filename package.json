@@ -1,5 +1,5 @@
 {
-  "name": "aibingwa-agent",
+  "name": "@0xMgwan/aibingwa-agent",
   "version": "1.0.0",
   "description": "Autonomous AI trading agent for Base blockchain. Self-sustaining DeFi agent with LLM reasoning, skill system, x402 micropayments, and autonomous trading.",
   "type": "module",
@@ -10,6 +10,9 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "files": [
     "dist",
