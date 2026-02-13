@@ -161,6 +161,10 @@ export class AgentBingwa {
   }
 
   // ── BANKR PROMPT ─────────────────────────────────────────
+  public getBankrPrompt(): BankrPromptFn {
+    return this.createBankrPrompt();
+  }
+
   private createBankrPrompt(): BankrPromptFn {
     const apiKey = this.bankrApiKey;
     const x402 = this.x402Client;
