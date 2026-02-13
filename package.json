@@ -13,8 +13,11 @@
   },
   "files": [
     "dist",
+    "src",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "tsconfig.json",
+    "tsup.config.ts"
   ],
   "engines": {
     "node": ">=20.0.0"
@@ -22,6 +25,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/index.ts",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -55,7 +59,9 @@
   },
   "dependencies": {
     "openai": "^6.21.0",
+    "tsup": "^8.4.0",
     "twitter-api-v2": "^1.29.0",
+    "typescript": "^5.8.2",
     "viem": "^2.45.3",
     "x402-fetch": "^1.1.0"
   },
@@ -70,8 +76,6 @@
   "devDependencies": {
     "@coinbase/agentkit": "latest",
     "@types/node": "^22.13.9",
-    "tsup": "^8.4.0",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "tsx": "^4.19.3"
   }
 }
