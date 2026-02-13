@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">🤖 AIBINGWA Agent</h1>
   <p align="center">
-    <strong>Autonomous AI Trading Agent for Base Blockchain</strong>
+    <strong>Autonomous AI trading Agent & ofcourse alot more! </strong>
   </p>
   <p align="center">
     Self-sustaining DeFi agent with LLM reasoning, pluggable skill system, x402 micropayments, autonomous trading engine, and Twitter/X integration.
@@ -22,7 +22,7 @@
 
 ## What is AIBINGWA?
 
-AIBINGWA is a modular, open-source AI agent framework designed for autonomous DeFi trading on Base blockchain. It combines:
+AIBINGWA is a modular, open-source AI agent framework designed for autonomous DeFi trading, analysis, autoexecution and alot more than just trading. You feed it skills. It combines:
 
 - **GPT-4o reasoning** — LLM brain that understands markets, evaluates risk, and makes trading decisions
 - **Bankr Agent API** — Execute swaps, research tokens, deploy contracts, and more on Base
