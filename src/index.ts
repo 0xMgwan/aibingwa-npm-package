@@ -143,6 +143,7 @@ export class AgentBingwa {
     const fullDeps: SkillDeps = {
       bankrPrompt: this.getBankrPrompt(),
       isBankrConfigured: () => !!this.bankrApiKey,
+      agentInstance: this,
       x402Client: this.x402Client || undefined,
       twitterClient: this.twitterClient || undefined,
       ...deps,
@@ -178,6 +179,13 @@ export class AgentBingwa {
     if (this.trader) {
       this.trader.stop();
     }
+  }
+
+  setPolymarketStrategy(strategy: string, scanIntervalMin?: number): string {
+    if (this.trader) {
+      return this.trader.setPolymarketStrategy(strategy, scanIntervalMin);
+    }
+    return "⚠️ Cannot set strategy — no Bankr API key configured";
   }
 
   // ── BANKR PROMPT ─────────────────────────────────────────

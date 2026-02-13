@@ -35,6 +35,7 @@ export interface SkillDeps {
   tokenRegistry?: Record<string, { symbol: string; name: string; address: string; decimals: number; pythFeedId?: string }>;
   isBankrConfigured: () => boolean;
   trader?: { scanMarket: () => Promise<string>; toggleAutoTrade: (on: boolean) => string; updateSettings: (u: any) => string; getMemory: () => any };
+  agentInstance?: { setPolymarketStrategy: (strategy: string, scanIntervalMin?: number) => string };
   x402Client?: BankrX402Client;
   twitterClient?: TwitterClient;
 }
@@ -431,6 +432,21 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
       if (!isBankrConfigured()) return "Bankr API not configured";
       const result = await bankrPrompt(`Execute this Polymarket strategy NOW. Search for the market, pick the best opportunity, and PLACE THE BET immediately. Strategy: ${params.strategy}`);
       return result.success ? result.response || "Trade executed" : `Failed: ${result.error}`;
+    },
+  });
+
+  registry.register({
+    name: "set_polymarket_strategy",
+    description: "Activate continuous autonomous Polymarket trading with a custom strategy. The agent will scan and execute trades on a loop based on the strategy. Use this when the user gives you a trading mandate like 'trade 15-min BTC markets for the next 24 hours'. This starts a CONTINUOUS loop — not a one-time trade.",
+    category: "prediction",
+    parameters: [
+      { name: "strategy", type: "string", description: "The full trading strategy/mandate from the user, e.g. 'Trade 15-minute BTC, XRP, SOLANA up/down markets. Budget $40. Trade conservatively.'", required: true },
+      { name: "scan_interval_min", type: "string", description: "How often to scan in minutes (default 15). Use shorter for short-term markets.", required: false },
+    ],
+    execute: async (params: any) => {
+      if (!deps.agentInstance) return "Agent instance not available for autonomous trading";
+      const interval = params.scan_interval_min ? parseInt(params.scan_interval_min) : undefined;
+      return deps.agentInstance.setPolymarketStrategy(params.strategy, interval);
     },
   });
 

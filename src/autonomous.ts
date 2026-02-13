@@ -1,6 +1,7 @@
 import {
   AgentMemory,
   TradeEntry,
+  PolymarketTrade,
   loadMemory,
   saveMemory,
   logTrade,
@@ -43,8 +44,11 @@ export class AutonomousTrader {
   private notify: NotifyFn;
   private scanTimer: ReturnType<typeof setInterval> | null = null;
   private monitorTimer: ReturnType<typeof setInterval> | null = null;
+  private polymarketTimer: ReturnType<typeof setInterval> | null = null;
   private isScanning = false;
   private isMonitoring = false;
+  private polymarketStrategy: string | null = null;
+  private polymarketScanIntervalMin = 15;
 
   constructor(bankrPrompt: BankrPromptFn, notify: NotifyFn) {
     this.memory = loadMemory();
@@ -72,16 +76,48 @@ export class AutonomousTrader {
       this.monitorPositions().catch(err => console.error("Monitor error:", err));
     }, monitorMs);
 
-    // Polymarket continuous scanning
-    setInterval(() => {
-      this.scanPolymarket().catch(err => console.error("Polymarket scan error:", err));
-    }, polymarketMs);
+    // Polymarket continuous scanning (if strategy is set)
+    if (this.polymarketStrategy) {
+      this.startPolymarketLoop();
+    }
   }
 
   stop(): void {
     if (this.scanTimer) clearInterval(this.scanTimer);
     if (this.monitorTimer) clearInterval(this.monitorTimer);
+    if (this.polymarketTimer) clearInterval(this.polymarketTimer);
+    this.polymarketStrategy = null;
     console.log("🛑 Autonomous trader stopped");
+  }
+
+  // ── POLYMARKET STRATEGY ────────────────────────────────
+  setPolymarketStrategy(strategy: string, scanIntervalMin?: number): string {
+    this.polymarketStrategy = strategy;
+    if (scanIntervalMin) this.polymarketScanIntervalMin = scanIntervalMin;
+    
+    console.log(`🎯 Polymarket strategy set (scan every ${this.polymarketScanIntervalMin}min)`);
+    console.log(`   Strategy: ${strategy.substring(0, 100)}...`);
+    
+    // Start the loop if trader is running
+    this.startPolymarketLoop();
+    
+    // Execute immediately on first call
+    this.scanPolymarket().catch(err => console.error("Polymarket scan error:", err));
+    
+    return `🎯 Polymarket auto-trading ACTIVATED\n\nStrategy: ${strategy.substring(0, 200)}\nScan interval: every ${this.polymarketScanIntervalMin} minutes\n\nI'll continuously scan and execute. No permissions needed. Let's go! 🚀`;
+  }
+
+  getPolymarketStrategy(): string | null {
+    return this.polymarketStrategy;
+  }
+
+  private startPolymarketLoop(): void {
+    if (this.polymarketTimer) clearInterval(this.polymarketTimer);
+    const ms = this.polymarketScanIntervalMin * 60 * 1000;
+    this.polymarketTimer = setInterval(() => {
+      this.scanPolymarket().catch(err => console.error("Polymarket scan error:", err));
+    }, ms);
+    console.log(`� Polymarket loop started (every ${this.polymarketScanIntervalMin}min)`);
   }
 
   getMemory(): AgentMemory {
@@ -339,17 +375,27 @@ export class AutonomousTrader {
 
   // ── POLYMARKET SCANNING ─────────────────────────────────
   async scanPolymarket(): Promise<string> {
-    if (!this.memory.settings.autoTradeEnabled) return "Auto-trade disabled";
+    if (!this.polymarketStrategy) return "No Polymarket strategy set";
 
     try {
-      console.log("🎯 Autonomous Polymarket scan: searching for opportunities...");
+      const stats = this.memory.polymarketStats || { totalBets: 0, wins: 0, losses: 0, totalPnl: 0 };
+      const recentLearnings = (this.memory.polymarketLearnings || []).slice(-5).join("\n");
+      
+      console.log("🎯 Autonomous Polymarket scan: executing strategy...");
 
       const scanResult = await this.bankrPrompt(
-        `Search Polymarket for the best short-term trading opportunities right now. ` +
-        `Focus on markets resolving within 24 hours or less (like 15-minute, 1-hour, daily up/down markets). ` +
-        `Look for BTC, ETH, SOL, XRP up/down markets. ` +
-        `For each opportunity, tell me: market name, current odds, and which side (Yes/No) has the best risk/reward. ` +
-        `Then PLACE A BET on the single best opportunity — bet $${this.memory.settings.maxBuyAmount} on the most favorable outcome.`
+        `You are executing a continuous Polymarket trading strategy.\n\n` +
+        `STRATEGY: ${this.polymarketStrategy}\n\n` +
+        `PAST PERFORMANCE:\n` +
+        `- Total bets: ${stats.totalBets} | Wins: ${stats.wins} | Losses: ${stats.losses}\n` +
+        `- P&L: $${stats.totalPnl.toFixed(2)}\n` +
+        `- Recent learnings:\n${recentLearnings || "No learnings yet — first scan."}\n\n` +
+        `INSTRUCTIONS:\n` +
+        `1. Search for matching markets based on the strategy\n` +
+        `2. Analyze odds and pick the best opportunity\n` +
+        `3. PLACE THE BET immediately — do NOT just describe what you would do\n` +
+        `4. If past bets lost, ADAPT your approach (e.g. switch sides, pick different markets)\n` +
+        `5. Report: what market, what side, how much, and why`
       );
 
       if (!scanResult.success) {
@@ -360,14 +406,71 @@ export class AutonomousTrader {
       const response = scanResult.response || "No results";
       console.log(`🎯 Polymarket scan result: ${response.substring(0, 150)}...`);
 
+      // Log the trade to memory
+      const trade: PolymarketTrade = {
+        id: `pm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        market: response.substring(0, 100),
+        outcome: "pending",
+        amount: this.memory.settings.maxBuyAmount,
+        odds: "see response",
+        timestamp: Date.now(),
+        result: "pending",
+        bankrResponse: response,
+      };
+      
+      if (!this.memory.polymarketTrades) this.memory.polymarketTrades = [];
+      this.memory.polymarketTrades.push(trade);
+      if (!this.memory.polymarketStats) {
+        this.memory.polymarketStats = { totalBets: 0, wins: 0, losses: 0, totalPnl: 0, bestStrategy: "", worstStrategy: "" };
+      }
+      this.memory.polymarketStats.totalBets++;
+      saveMemory(this.memory);
+
+      // Refine strategy — learn from this scan
+      await this.refinePolymarketStrategy(response);
+
       await this.notify(
-        `🎯 *Polymarket Auto-Scan*\n\n${response}`
+        `🎯 *Polymarket Auto-Trade #${stats.totalBets + 1}*\n\n${response}`
       );
 
       return response;
     } catch (err: any) {
       console.error("❌ Polymarket scan error:", err.message);
       return `Polymarket scan error: ${err.message}`;
+    }
+  }
+
+  // ── POLYMARKET STRATEGY REFINEMENT ─────────────────────
+  private async refinePolymarketStrategy(lastResult: string): Promise<void> {
+    try {
+      const stats = this.memory.polymarketStats;
+      const recentTrades = (this.memory.polymarketTrades || []).slice(-5);
+      
+      const refinementResult = await this.bankrPrompt(
+        `You are an AI trading agent reflecting on your Polymarket performance.\n\n` +
+        `CURRENT STRATEGY: ${this.polymarketStrategy}\n` +
+        `STATS: ${stats.totalBets} bets, ${stats.wins}W/${stats.losses}L, P&L: $${stats.totalPnl.toFixed(2)}\n` +
+        `LAST RESULT: ${lastResult.substring(0, 200)}\n\n` +
+        `In 1-2 sentences, what should you adjust for the next scan? ` +
+        `Consider: market selection, timing, position sizing, which side to bet on. ` +
+        `If winning, keep doing what works. If losing, adapt.`
+      );
+
+      if (refinementResult.success && refinementResult.response) {
+        const learning = `[${new Date().toISOString().slice(0, 16)}] ${refinementResult.response}`;
+        if (!this.memory.polymarketLearnings) this.memory.polymarketLearnings = [];
+        this.memory.polymarketLearnings.push(learning);
+        
+        // Keep last 20 learnings
+        if (this.memory.polymarketLearnings.length > 20) {
+          this.memory.polymarketLearnings = this.memory.polymarketLearnings.slice(-20);
+        }
+        
+        saveMemory(this.memory);
+        console.log(`🧠 Polymarket learning: ${refinementResult.response.substring(0, 100)}`);
+      }
+    } catch {
+      // Refinement is non-critical
     }
   }
 

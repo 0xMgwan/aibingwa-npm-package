@@ -36,14 +36,36 @@ export interface TokenMemory {
   tags: string[];
 }
 
+export interface PolymarketTrade {
+  id: string;
+  market: string;
+  outcome: string;
+  amount: string;
+  odds: string;
+  timestamp: number;
+  result?: "win" | "loss" | "pending";
+  pnl?: string;
+  bankrResponse?: string;
+}
+
 export interface AgentMemory {
   tokens: Record<string, TokenMemory>;
   trades: TradeEntry[];
+  polymarketTrades: PolymarketTrade[];
   learnings: string[];
+  polymarketLearnings: string[];
   lastScanTime: number;
   totalTrades: number;
   winRate: number;
   totalPnl: number;
+  polymarketStats: {
+    totalBets: number;
+    wins: number;
+    losses: number;
+    totalPnl: number;
+    bestStrategy: string;
+    worstStrategy: string;
+  };
   settings: {
     maxMarketCap: number;
     maxBuyAmount: string;
@@ -61,11 +83,21 @@ export interface AgentMemory {
 const DEFAULT_MEMORY: AgentMemory = {
   tokens: {},
   trades: [],
+  polymarketTrades: [],
   learnings: [],
+  polymarketLearnings: [],
   lastScanTime: 0,
   totalTrades: 0,
   winRate: 0,
   totalPnl: 0,
+  polymarketStats: {
+    totalBets: 0,
+    wins: 0,
+    losses: 0,
+    totalPnl: 0,
+    bestStrategy: "",
+    worstStrategy: "",
+  },
   settings: {
     maxMarketCap: parseInt(process.env.MAX_MARKET_CAP || "40000"),
     maxBuyAmount: process.env.MAX_BUY_AMOUNT || "5",
