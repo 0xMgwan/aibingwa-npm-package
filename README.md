@@ -382,6 +382,27 @@ registerAllSkills(agent.skills, deps);
 
 // Now the agent has all skills: trading, research, leverage, NFT, x402, Twitter, etc.
 console.log(`Registered ${agent.getSkillCount()} skills`);
+
+// === MESSAGE HANDLING ===
+// Route ALL user messages through the agent for context-aware conversations:
+// The agent maintains conversation memory and understands follow-ups like:
+// "Nice. How are the 15min BTC..." after a previous trade discussion
+// "What about my wallet?" after discussing trades
+// "Thanks" followed by "What's next?"
+async function handleMessage(chatId: string, userName: string, message: string): Promise<string> {
+  return await agent.processMessage(chatId, userName, message);
+}
+
+// Example with Telegram bot:
+bot.on("message:text", async (ctx) => {
+  await ctx.api.sendChatAction(ctx.chat.id, "typing"); // Show typing indicator
+  const response = await agent.processMessage(
+    ctx.chat.id.toString(),
+    ctx.from?.first_name || "anon",
+    ctx.message.text
+  );
+  await ctx.reply(response, { parse_mode: "Markdown" });
+});
 ```
 
 **Skills included:**
