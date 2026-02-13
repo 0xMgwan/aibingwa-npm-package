@@ -1,0 +1,77 @@
+{
+  "name": "aibingwa-agent",
+  "version": "1.0.0",
+  "description": "Autonomous AI trading agent for Base blockchain. Self-sustaining DeFi agent with LLM reasoning, skill system, x402 micropayments, and autonomous trading.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "trading",
+    "defi",
+    "base",
+    "blockchain",
+    "autonomous",
+    "llm",
+    "openai",
+    "bankr",
+    "x402",
+    "micropayments",
+    "telegram",
+    "crypto",
+    "erc20",
+    "low-cap",
+    "self-sustaining"
+  ],
+  "author": "0xMgwan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xMgwan/aibingwa-package.git"
+  },
+  "homepage": "https://github.com/0xMgwan/aibingwa-package#readme",
+  "bugs": {
+    "url": "https://github.com/0xMgwan/aibingwa-package/issues"
+  },
+  "dependencies": {
+    "openai": "^6.21.0",
+    "twitter-api-v2": "^1.29.0",
+    "viem": "^2.45.3",
+    "x402-fetch": "^1.1.0"
+  },
+  "peerDependencies": {
+    "@coinbase/agentkit": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@coinbase/agentkit": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@coinbase/agentkit": "latest",
+    "@types/node": "^22.13.9",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
