@@ -22,6 +22,7 @@ export {
 export { AutonomousTrader, type BankrPromptFn, type NotifyFn } from "./autonomous.js";
 export { BankrX402Client } from "./bankr-x402.js";
 export { TwitterClient, type TwitterConfig } from "./twitter.js";
+export { registerAllSkills, type SkillDeps } from "./register-skills.js";
 
 // Internal imports for AgentBingwa class
 import { SkillRegistry } from "./skills.js";
