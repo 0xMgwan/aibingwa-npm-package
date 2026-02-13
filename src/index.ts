@@ -190,8 +190,11 @@ export class AgentBingwa {
     const x402 = this.x402Client;
 
     return async (prompt: string, threadId?: string) => {
-      // Try x402 first if available
-      if (x402 && x402.isAvailable()) {
+      // Use API key mode first (primary — /agent/prompt endpoint)
+      if (apiKey) {
+        // API key mode below
+      } else if (x402 && x402.isAvailable()) {
+        // Fall back to x402 micropayment mode if no API key
         const result = await x402.prompt(prompt);
         return {
           success: result.success,
@@ -200,10 +203,7 @@ export class AgentBingwa {
           response: result.response,
           error: result.error,
         };
-      }
-
-      // Fall back to API key mode
-      if (!apiKey) {
+      } else {
         return { success: false, jobId: "", status: "no_key", error: "No Bankr API key or x402 configured" };
       }
 
