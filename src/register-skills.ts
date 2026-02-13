@@ -379,39 +379,25 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
   });
 
   // ── PREDICTION MARKET SKILLS ─────────────────────────────
+  // PRIMARY SKILL: Use this for ALL Polymarket actions — betting, trading, scanning, everything.
+  // Bankr handles the full flow: find market → analyze → place bet.
   registry.register({
-    name: "polymarket_query",
-    description: "Query Polymarket prediction markets — find markets, check odds, place bets",
+    name: "polymarket",
+    description: "DO ANYTHING on Polymarket — bet, trade, scan markets, check odds, find opportunities. This is the PRIMARY Polymarket skill. Use it whenever the user mentions Polymarket, betting, prediction markets, or wants to place a bet. Pass the user's full request as the prompt. Examples: 'Bet $2 on BTC 15min up', 'Find best 15-minute markets and bet', 'What are the odds on SOL going up?'",
     category: "prediction",
     parameters: [
-      { name: "query", type: "string", description: "What to ask about Polymarket (e.g., 'top markets', 'odds on ETH hitting 5k')", required: true },
+      { name: "prompt", type: "string", description: "The full Polymarket action to execute. Be specific: include market name, amount, outcome (Yes/No/Up/Down) if betting. Examples: 'Bet $5 on Yes for BTC 15-minute up/down market', 'Search for trending prediction markets', 'Show my positions'", required: true },
     ],
     execute: async (params: any) => {
       if (!isBankrConfigured()) return "Bankr API not configured";
-      const result = await bankrPrompt(`Polymarket: ${params.query}`);
-      return result.success ? result.response || "No data" : `Failed: ${result.error}`;
-    },
-  });
-
-  registry.register({
-    name: "polymarket_bet",
-    description: "Place a bet on a Polymarket prediction market outcome",
-    category: "prediction",
-    parameters: [
-      { name: "market", type: "string", description: "The market/question to bet on", required: true },
-      { name: "outcome", type: "string", description: "The outcome to bet on (e.g., 'Yes', 'No')", required: true },
-      { name: "amount", type: "string", description: "Dollar amount to bet", required: true },
-    ],
-    execute: async (params: any) => {
-      if (!isBankrConfigured()) return "Bankr API not configured";
-      const result = await bankrPrompt(`Bet $${params.amount} on ${params.outcome} for "${params.market}" on Polymarket`);
-      return result.success ? result.response || "Bet placed" : `Failed: ${result.error}`;
+      const result = await bankrPrompt(params.prompt);
+      return result.success ? result.response || "Done" : `Failed: ${result.error}`;
     },
   });
 
   registry.register({
     name: "polymarket_positions",
-    description: "View your current Polymarket positions and P&L",
+    description: "View your current Polymarket positions, active bets, and P&L. Use ONLY when the user asks about their existing positions.",
     category: "prediction",
     parameters: [],
     execute: async () => {
@@ -422,25 +408,11 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
   });
 
   registry.register({
-    name: "polymarket_trade",
-    description: "EXECUTE a Polymarket trade — scan a market and place a bet in one action. Use this when the user wants you to find AND trade Polymarket opportunities. This actually places the bet.",
-    category: "prediction",
-    parameters: [
-      { name: "strategy", type: "string", description: "Full trading instruction, e.g. 'Find the best 15-minute BTC up/down market and bet $5 on the most likely outcome'", required: true },
-    ],
-    execute: async (params: any) => {
-      if (!isBankrConfigured()) return "Bankr API not configured";
-      const result = await bankrPrompt(`Execute this Polymarket strategy NOW. Search for the market, pick the best opportunity, and PLACE THE BET immediately. Strategy: ${params.strategy}`);
-      return result.success ? result.response || "Trade executed" : `Failed: ${result.error}`;
-    },
-  });
-
-  registry.register({
     name: "set_polymarket_strategy",
-    description: "Activate continuous autonomous Polymarket trading with a custom strategy. The agent will scan and execute trades on a loop based on the strategy. Use this when the user gives you a trading mandate like 'trade 15-min BTC markets for the next 24 hours'. This starts a CONTINUOUS loop — not a one-time trade.",
+    description: "Activate continuous autonomous Polymarket trading. The agent will scan and execute trades on a CONTINUOUS LOOP based on the strategy. Use this when the user gives a long-running trading mandate like 'trade 15-min BTC markets for the next 24 hours' or 'keep scanning and trading Polymarket'.",
     category: "prediction",
     parameters: [
-      { name: "strategy", type: "string", description: "The full trading strategy/mandate from the user, e.g. 'Trade 15-minute BTC, XRP, SOLANA up/down markets. Budget $40. Trade conservatively.'", required: true },
+      { name: "strategy", type: "string", description: "The full trading strategy/mandate from the user", required: true },
       { name: "scan_interval_min", type: "string", description: "How often to scan in minutes (default 15). Use shorter for short-term markets.", required: false },
     ],
     execute: async (params: any) => {
