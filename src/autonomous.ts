@@ -381,13 +381,25 @@ export class AutonomousTrader {
       const stats = this.memory.polymarketStats || { totalBets: 0, wins: 0, losses: 0, totalPnl: 0 };
       const recentLearnings = (this.memory.polymarketLearnings || []).slice(-5).join("\n");
       
-      // Extract budget from strategy if mentioned (e.g., "$40 wallet")
-      const budgetMatch = this.polymarketStrategy.match(/\$(\d+)/);
-      const totalBudget = budgetMatch ? parseInt(budgetMatch[1]) : 100;
-      const perTradeAmount = Math.max(1, Math.floor(totalBudget / 10)); // Divide budget into ~10 trades
+      // Extract per-trade amount from strategy (e.g., "$4 per trade" or "$4 per bet")
+      // If "per trade" is mentioned, use that amount directly. Otherwise, divide total budget by 10.
+      const perTradeMatch = this.polymarketStrategy.match(/\$(\d+)\s*(?:per\s+trade|per\s+bet)/i);
+      let perTradeAmount: number;
+      let totalBudget: number;
+      
+      if (perTradeMatch) {
+        // User specified "$X per trade" — use it directly
+        perTradeAmount = parseInt(perTradeMatch[1]);
+        totalBudget = perTradeAmount; // For logging purposes
+      } else {
+        // User specified total budget — divide into ~10 trades
+        const budgetMatch = this.polymarketStrategy.match(/\$(\d+)/);
+        totalBudget = budgetMatch ? parseInt(budgetMatch[1]) : 100;
+        perTradeAmount = Math.max(1, Math.floor(totalBudget / 10));
+      }
       
       console.log("🎯 Autonomous Polymarket scan: executing strategy...");
-      console.log(`   Budget: $${totalBudget} | Per-trade amount: $${perTradeAmount}`);
+      console.log(`   Per-trade amount: $${perTradeAmount}`);
 
       const scanResult = await this.bankrPrompt(
         `You are executing a continuous Polymarket trading strategy.\n\n` +
