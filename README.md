@@ -207,37 +207,153 @@ console.log(response);
 
 ### Telegram Bot Example
 
-```typescript
-import { Bot } from "grammy";
-import { AgentBingwa } from "aibingwa-agent";
+#### Step 1: Create a Telegram Bot via BotFather
 
-const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN!);
+1. Open Telegram and search for `@BotFather`
+2. Send `/newbot` and follow the prompts:
+   - Bot name: `AIBINGWA` (or your preferred name)
+   - Bot username: `aibingwa_bot` (must be unique, ends with `_bot`)
+3. BotFather will give you a **token** like: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`
+4. Save this token as `TELEGRAM_BOT_TOKEN` in your `.env`
 
-const agent = new AgentBingwa({
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  bankrApiKey: process.env.BANKR_API_KEY,
-  onNotify: async (msg) => {
-    await bot.api.sendMessage(process.env.OWNER_CHAT_ID!, msg, { parse_mode: "Markdown" });
-  },
-});
+#### Step 2: Get Your Chat ID
 
-// Register your DeFi skills here...
-// agent.skills.register({ ... });
+1. Send a message to your bot
+2. Visit: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
+3. Find your chat ID in the response (usually under `message.chat.id`)
+4. Save as `OWNER_CHAT_ID` in your `.env`
 
-// Start autonomous trading
-agent.startTrading();
+#### Step 3: Set Environment Variables
 
-bot.on("message:text", async (ctx) => {
-  const reply = await agent.processMessage(
-    ctx.chat.id.toString(),
-    ctx.from?.first_name || "anon",
-    ctx.message.text,
-  );
-  await ctx.reply(reply, { parse_mode: "Markdown" });
-});
+```bash
+# Required
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+OWNER_CHAT_ID=987654321
+OPENAI_API_KEY=sk-...
 
-bot.start();
+# DeFi (choose one)
+BANKR_API_KEY=bankr_...          # API key mode
+# OR
+X402_PRIVATE_KEY=0x...           # x402 micropayment mode
+
+# Optional
+X_CONSUMER_KEY=...               # Twitter/X credentials
+X_CONSUMER_SECRET=...
+X_ACCESS_TOKEN=...
+X_ACCESS_TOKEN_SECRET=...
 ```
+
+#### Step 4: Implement Your Bot
+
+```typescript
+import { Bot, session, SessionFlavor, Context } from "grammy";
+import { AgentBingwa } from "aibingwa-agent";
+import "dotenv/config";
+
+interface SessionData {
+  messageCount: number;
+}
+
+type MyContext = Context & SessionFlavor<SessionData>;
+
+async function main() {
+  // Create bot
+  const bot = new Bot<MyContext>(process.env.TELEGRAM_BOT_TOKEN!);
+
+  // Add session middleware
+  bot.use(session({ initial: () => ({ messageCount: 0 }) }));
+
+  // Initialize agent
+  const agent = new AgentBingwa({
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    bankrApiKey: process.env.BANKR_API_KEY,
+    x402PrivateKey: process.env.X402_PRIVATE_KEY,
+    onNotify: async (msg: string) => {
+      // Send trade alerts to owner
+      if (process.env.OWNER_CHAT_ID) {
+        await bot.api.sendMessage(process.env.OWNER_CHAT_ID, msg, { parse_mode: "Markdown" });
+      }
+    },
+  });
+
+  // Register custom skills
+  agent.skills.register({
+    name: "check_balance",
+    description: "Check wallet balance",
+    category: "wallet",
+    parameters: [
+      { name: "token", type: "string", description: "Token symbol", required: true },
+    ],
+    execute: async (params: any) => {
+      // Your implementation
+      return `Balance: 10 ${params.token}`;
+    },
+  });
+
+  // Start autonomous trading (optional)
+  agent.startTrading();
+
+  // Handle messages
+  bot.on("message:text", async (ctx) => {
+    const response = await agent.processMessage(
+      ctx.chat.id.toString(),
+      ctx.from?.first_name || "anon",
+      ctx.message.text
+    );
+    await ctx.reply(response, { parse_mode: "Markdown" });
+  });
+
+  // Commands
+  bot.command("start", async (ctx) => {
+    await ctx.reply("🤖 AIBINGWA agent is ready! Send me a message.");
+  });
+
+  bot.command("help", async (ctx) => {
+    await ctx.reply(
+      "📖 *Available Commands*\n\n" +
+      "• /start — Start the bot\n" +
+      "• /help — Show this message\n\n" +
+      "Just chat naturally — I'll understand your intent!"
+    );
+  });
+
+  // Start
+  console.log("🤖 Bot starting...");
+  bot.start();
+}
+
+main().catch(console.error);
+```
+
+#### Step 5: Deploy
+
+**Local Testing:**
+```bash
+npm install
+npm run dev
+```
+
+**Production (Railway, Heroku, etc.):**
+```bash
+npm install
+npm run build
+npm start
+```
+
+#### Full Working Example
+
+See the complete Telegram bot implementation at:
+https://github.com/0xMgwan/AIbingwa
+
+It includes:
+- Natural language parsing
+- Token balance checking
+- Swaps via AgentKit
+- Wallet persistence
+- Conversational personality
+- Autonomous trading integration
+
+---
 
 ### Using Individual Modules
 
