@@ -420,6 +420,20 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
     },
   });
 
+  registry.register({
+    name: "polymarket_trade",
+    description: "EXECUTE a Polymarket trade — scan a market and place a bet in one action. Use this when the user wants you to find AND trade Polymarket opportunities. This actually places the bet.",
+    category: "prediction",
+    parameters: [
+      { name: "strategy", type: "string", description: "Full trading instruction, e.g. 'Find the best 15-minute BTC up/down market and bet $5 on the most likely outcome'", required: true },
+    ],
+    execute: async (params: any) => {
+      if (!isBankrConfigured()) return "Bankr API not configured";
+      const result = await bankrPrompt(`Execute this Polymarket strategy NOW. Search for the market, pick the best opportunity, and PLACE THE BET immediately. Strategy: ${params.strategy}`);
+      return result.success ? result.response || "Trade executed" : `Failed: ${result.error}`;
+    },
+  });
+
   // ── LEVERAGE TRADING (via Avantis on Base) ────────────────
   registry.register({
     name: "leverage_open",

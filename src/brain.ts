@@ -154,9 +154,10 @@ When asked to find opportunities or trade:
 7. Be proactive — spot opportunities and execute before asked
 8. Remember what the user cares about and adapt your approach
 9. When the user says "trade for me" or "find me something" — GO HUNT AND EXECUTE. Don't just talk about it
-10. For Polymarket: use polymarket_query to find markets, polymarket_bet to place bets, polymarket_positions to track. EXECUTE immediately.
+10. For Polymarket: use polymarket_trade to scan AND execute in one step. Use polymarket_query ONLY for research. If the user wants to trade, ALWAYS use polymarket_trade — it actually places the bet.
 11. For token trades: use snipe_token, sell_token, bankr_prompt. EXECUTE immediately.
-12. When in auto-trade mode: scan, find, research, and execute trades WITHOUT asking. Report after execution.`;
+12. When in auto-trade mode: scan, find, research, and execute trades WITHOUT asking. Report after execution.
+13. CRITICAL: After scanning/querying, you MUST follow up with an execution skill. Never stop at just showing results. Query → Execute → Report.`;
   }
 
   // ── PROCESS MESSAGE ──────────────────────────────────────

@@ -56,11 +56,13 @@ export class AutonomousTrader {
   start(): void {
     const scanMs = this.memory.settings.scanIntervalMin * 60 * 1000;
     const monitorMs = 5 * 60 * 1000;
+    const polymarketMs = this.memory.settings.scanIntervalMin * 60 * 1000;
 
     console.log(`🤖 Autonomous trader started (scan every ${this.memory.settings.scanIntervalMin}min)`);
     console.log(`   Auto-trade: ${this.memory.settings.autoTradeEnabled ? "ON" : "OFF"}`);
     console.log(`   Max mcap: $${this.memory.settings.maxMarketCap}`);
     console.log(`   Buy amount: $${this.memory.settings.maxBuyAmount}`);
+    console.log(`   Polymarket scanning: ON`);
 
     this.scanTimer = setInterval(() => {
       this.scanMarket().catch(err => console.error("Scan error:", err));
@@ -69,6 +71,11 @@ export class AutonomousTrader {
     this.monitorTimer = setInterval(() => {
       this.monitorPositions().catch(err => console.error("Monitor error:", err));
     }, monitorMs);
+
+    // Polymarket continuous scanning
+    setInterval(() => {
+      this.scanPolymarket().catch(err => console.error("Polymarket scan error:", err));
+    }, polymarketMs);
   }
 
   stop(): void {
@@ -328,6 +335,40 @@ export class AutonomousTrader {
     }
 
     this.isMonitoring = false;
+  }
+
+  // ── POLYMARKET SCANNING ─────────────────────────────────
+  async scanPolymarket(): Promise<string> {
+    if (!this.memory.settings.autoTradeEnabled) return "Auto-trade disabled";
+
+    try {
+      console.log("🎯 Autonomous Polymarket scan: searching for opportunities...");
+
+      const scanResult = await this.bankrPrompt(
+        `Search Polymarket for the best short-term trading opportunities right now. ` +
+        `Focus on markets resolving within 24 hours or less (like 15-minute, 1-hour, daily up/down markets). ` +
+        `Look for BTC, ETH, SOL, XRP up/down markets. ` +
+        `For each opportunity, tell me: market name, current odds, and which side (Yes/No) has the best risk/reward. ` +
+        `Then PLACE A BET on the single best opportunity — bet $${this.memory.settings.maxBuyAmount} on the most favorable outcome.`
+      );
+
+      if (!scanResult.success) {
+        console.log("⚠️ Polymarket scan failed:", scanResult.error);
+        return `Polymarket scan failed: ${scanResult.error}`;
+      }
+
+      const response = scanResult.response || "No results";
+      console.log(`🎯 Polymarket scan result: ${response.substring(0, 150)}...`);
+
+      await this.notify(
+        `🎯 *Polymarket Auto-Scan*\n\n${response}`
+      );
+
+      return response;
+    } catch (err: any) {
+      console.error("❌ Polymarket scan error:", err.message);
+      return `Polymarket scan error: ${err.message}`;
+    }
   }
 
   // ── MANUAL ACTIONS ───────────────────────────────────────
