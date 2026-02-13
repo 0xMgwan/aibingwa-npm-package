@@ -197,20 +197,31 @@ When asked to find opportunities or trade:
         })),
       ];
 
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages,
-        tools: this.skills.toOpenAITools(),
-        tool_choice: "auto",
-        temperature: 0.5,
-        max_tokens: 800,
-      });
+      // Allow up to 5 rounds of tool calls so the brain can chain skills
+      // e.g. polymarket_query → polymarket_bet, or scan_market → research_token → snipe_token
+      let assistantMessage = "";
+      const MAX_TOOL_ROUNDS = 5;
 
-      const choice = response.choices[0];
-      let assistantMessage = choice.message.content || "";
-      const toolCalls = choice.message.tool_calls;
+      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        const response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages,
+          tools: this.skills.toOpenAITools(),
+          tool_choice: "auto",
+          temperature: 0.5,
+          max_tokens: 800,
+        });
 
-      if (toolCalls && toolCalls.length > 0) {
+        const choice = response.choices[0];
+        const toolCalls = choice.message.tool_calls;
+
+        if (!toolCalls || toolCalls.length === 0) {
+          // No more tool calls — we have the final text response
+          assistantMessage = choice.message.content || "Done!";
+          break;
+        }
+
+        // Execute all tool calls in this round
         messages.push(choice.message);
 
         const toolPromises = toolCalls.map(async (toolCall) => {
@@ -236,13 +247,16 @@ When asked to find opportunities or trade:
         messages.push(...toolResults);
 
         if (statusCallback) await statusCallback("🧠 Analyzing results...").catch(() => {});
+      }
+
+      // If we exhausted all rounds without a text response, get one now
+      if (!assistantMessage) {
         const finalResponse = await this.openai.chat.completions.create({
           model: this.model,
           messages,
           temperature: 0.5,
           max_tokens: 800,
         });
-
         assistantMessage = finalResponse.choices[0].message.content || "Done!";
       }
 
