@@ -403,10 +403,19 @@ export class AutonomousTrader {
         perTradeAmount = parseInt(perTradeMatch[1]);
         totalBudget = perTradeAmount; // For logging purposes
       } else {
-        // User specified total budget — divide into ~10 trades
+        // User specified total budget — divide into trades
         const budgetMatch = this.polymarketStrategy.match(/\$(\d+)/);
         totalBudget = budgetMatch ? parseInt(budgetMatch[1]) : 100;
-        perTradeAmount = Math.max(1, Math.floor(totalBudget / 10));
+        
+        // Survival mode: if user says "life depends on it", "last dollar", "can't lose" etc.
+        // Use smaller bets (budget/20) for maximum capital preservation
+        const isSurvivalMode = /life\s+depends|last\s+\$|can'?t\s+lose|protect\s+capital|survive|last\s+\d+/i.test(this.polymarketStrategy);
+        const divisor = isSurvivalMode ? 20 : 10;
+        perTradeAmount = Math.max(1, Math.floor(totalBudget / divisor));
+        
+        if (isSurvivalMode) {
+          console.log("🛡️ SURVIVAL MODE: Extra conservative — smaller bets, more selective");
+        }
       }
       
       console.log("🎯 Autonomous Polymarket scan: executing strategy...");
