@@ -373,6 +373,17 @@ export class AutonomousTrader {
     this.isMonitoring = false;
   }
 
+  // ── POLYMARKET HELPERS ──────────────────────────────────
+  private countConsecutiveLosses(): number {
+    const trades = (this.memory.polymarketTrades || []).slice().reverse();
+    let count = 0;
+    for (const t of trades) {
+      if (t.result === "loss") count++;
+      else break;
+    }
+    return count;
+  }
+
   // ── POLYMARKET SCANNING ─────────────────────────────────
   async scanPolymarket(): Promise<string> {
     if (!this.polymarketStrategy) return "No Polymarket strategy set";
@@ -401,20 +412,44 @@ export class AutonomousTrader {
       console.log("🎯 Autonomous Polymarket scan: executing strategy...");
       console.log(`   Per-trade amount: $${perTradeAmount}`);
 
+      // Loss streak protection: reduce bet or skip after consecutive losses
+      const recentTrades = (this.memory.polymarketTrades || []).slice(-5);
+      const recentLosses = recentTrades.filter(t => t.result === "loss").length;
+      const consecutiveLosses = this.countConsecutiveLosses();
+      
+      let adjustedAmount = perTradeAmount;
+      let skipMessage = "";
+      
+      if (consecutiveLosses >= 4) {
+        // 4+ losses in a row — pause and skip this scan
+        console.log("⚠️ 4+ consecutive losses — skipping this scan to protect capital");
+        await this.notify("⚠️ *Polymarket Auto-Trade: PAUSED*\n\n4+ consecutive losses detected. Skipping this scan to protect capital. Will resume next cycle with fresh analysis.");
+        return "Skipped: 4+ consecutive losses — protecting capital";
+      } else if (consecutiveLosses >= 2) {
+        // 2-3 losses — reduce bet size by half
+        adjustedAmount = Math.max(1, Math.floor(perTradeAmount / 2));
+        skipMessage = `\n⚠️ CAUTION: ${consecutiveLosses} consecutive losses. Bet reduced to $${adjustedAmount}. Be extra selective.`;
+      }
+
       const scanResult = await this.bankrPrompt(
-        `You are executing a continuous Polymarket trading strategy.\n\n` +
+        `You are a disciplined Polymarket trading agent. Your goal is PROFITABILITY, not activity.\n\n` +
         `STRATEGY: ${this.polymarketStrategy}\n\n` +
-        `BUDGET: You have $${totalBudget} total. Bet $${perTradeAmount} per trade to manage risk.\n\n` +
+        `BET AMOUNT: $${adjustedAmount} per trade.${skipMessage}\n\n` +
         `PAST PERFORMANCE:\n` +
         `- Total bets: ${stats.totalBets} | Wins: ${stats.wins} | Losses: ${stats.losses}\n` +
+        `- Win rate: ${stats.totalBets > 0 ? ((stats.wins / stats.totalBets) * 100).toFixed(0) : "N/A"}%\n` +
         `- P&L: $${stats.totalPnl.toFixed(2)}\n` +
+        `- Consecutive losses: ${consecutiveLosses}\n` +
         `- Recent learnings:\n${recentLearnings || "No learnings yet — first scan."}\n\n` +
-        `INSTRUCTIONS:\n` +
-        `1. Search for matching markets based on the strategy\n` +
-        `2. Analyze odds and pick the best opportunity\n` +
-        `3. PLACE THE BET IMMEDIATELY for $${perTradeAmount} — do NOT ask for confirmation or amount\n` +
-        `4. If past bets lost, ADAPT your approach (e.g. switch sides, pick different markets)\n` +
-        `5. Report: what market, what side, $${perTradeAmount} bet, and why`
+        `CRITICAL RULES FOR PROFITABILITY:\n` +
+        `1. ONLY bet when you see a CLEAR EDGE — odds that are mispriced or strong momentum in one direction\n` +
+        `2. If odds are close to 50/50 (between 45%-55%), DO NOT BET. Say "SKIP: No clear edge found" instead\n` +
+        `3. Look for markets where one side has 55%+ probability — that's where the edge is\n` +
+        `4. Check recent price movement/momentum before betting — bet WITH the trend, not against it\n` +
+        `5. If you've been losing, SWITCH your approach entirely — different markets, different sides, different timeframes\n` +
+        `6. NEVER bet just because you can. Skipping is a valid and smart decision.\n` +
+        `7. If you find a good edge, PLACE THE BET for $${adjustedAmount}. If not, respond with "SKIP: [reason]"\n` +
+        `8. Report: market name, side chosen, odds, WHY you think this has an edge, and amount bet`
       );
 
       if (!scanResult.success) {
@@ -425,12 +460,21 @@ export class AutonomousTrader {
       const response = scanResult.response || "No results";
       console.log(`🎯 Polymarket scan result: ${response.substring(0, 150)}...`);
 
-      // Log the trade to memory
+      // Check if Bankr decided to SKIP (no edge found)
+      const isSkip = response.toUpperCase().includes("SKIP:");
+      
+      if (isSkip) {
+        console.log("⏭️ Polymarket scan: No edge found, skipping this cycle");
+        await this.notify(`⏭️ *Polymarket Scan — Skipped*\n\n${response}\n\n_Waiting for better opportunity next cycle._`);
+        return response;
+      }
+
+      // Log the actual trade to memory
       const trade: PolymarketTrade = {
         id: `pm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         market: response.substring(0, 100),
         outcome: "pending",
-        amount: this.memory.settings.maxBuyAmount,
+        amount: String(adjustedAmount),
         odds: "see response",
         timestamp: Date.now(),
         result: "pending",
@@ -465,14 +509,23 @@ export class AutonomousTrader {
       const stats = this.memory.polymarketStats;
       const recentTrades = (this.memory.polymarketTrades || []).slice(-5);
       
+      const winRate = stats.totalBets > 0 ? ((stats.wins / stats.totalBets) * 100).toFixed(0) : "N/A";
+      const recentTradesSummary = recentTrades.map(t => 
+        `${t.market.substring(0, 50)} → ${t.result}`
+      ).join("\n") || "No trades yet";
+
       const refinementResult = await this.bankrPrompt(
         `You are an AI trading agent reflecting on your Polymarket performance.\n\n` +
         `CURRENT STRATEGY: ${this.polymarketStrategy}\n` +
-        `STATS: ${stats.totalBets} bets, ${stats.wins}W/${stats.losses}L, P&L: $${stats.totalPnl.toFixed(2)}\n` +
-        `LAST RESULT: ${lastResult.substring(0, 200)}\n\n` +
-        `In 1-2 sentences, what should you adjust for the next scan? ` +
-        `Consider: market selection, timing, position sizing, which side to bet on. ` +
-        `If winning, keep doing what works. If losing, adapt.`
+        `STATS: ${stats.totalBets} bets, ${stats.wins}W/${stats.losses}L, Win rate: ${winRate}%, P&L: $${stats.totalPnl.toFixed(2)}\n` +
+        `RECENT TRADES:\n${recentTradesSummary}\n` +
+        `LAST RESULT: ${lastResult.substring(0, 300)}\n\n` +
+        `In 1-2 sentences, give a SPECIFIC actionable adjustment:\n` +
+        `- Which specific markets/assets performed best?\n` +
+        `- Should we switch sides (Up vs Down)?\n` +
+        `- Should we avoid certain markets entirely?\n` +
+        `- Is there a pattern in wins vs losses?\n` +
+        `Be concrete: "Bet on XRP Down instead of Up" not "consider adjusting".`
       );
 
       if (refinementResult.success && refinementResult.response) {
