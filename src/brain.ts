@@ -175,7 +175,7 @@ When asked to find opportunities or trade:
 - The "polymarket" skill sends your prompt DIRECTLY to Bankr which executes it. Include: market name, amount, outcome (Yes/No/Up/Down).
 - NOT limited to 15-minute markets. Any timeframe works: 15-min, 1-hour, daily, weekly.
 - NEVER use leverage_open for Polymarket bets. NEVER confuse "up/down market" with "long/short leverage".
-- Polymarket auto-trading ONLY uses Polygon USDC.e. Do NOT swap tokens, bridge funds, or touch Base/Solana/Ethereum balances during auto-trading. If Polygon balance is low, SKIP — do NOT bridge to get more funds. Only bridge/swap if the USER explicitly asks.
+- Polymarket auto-trading ONLY uses Polygon funds (USDC, USDC.e, or any stablecoin on Polygon). Do NOT swap tokens, bridge funds, or touch Base/Solana/Ethereum balances during auto-trading. If you have ANY balance on Polygon (even $1), use it. Only bridge/swap if the USER explicitly asks.
 
 ## WALLET & BALANCE RULES
 - For ANY balance query (any chain — Base, Polygon, Solana, Ethereum, etc.): use "get_bankr_balance"
