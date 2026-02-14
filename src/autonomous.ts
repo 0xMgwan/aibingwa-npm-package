@@ -392,34 +392,51 @@ export class AutonomousTrader {
       const stats = this.memory.polymarketStats || { totalBets: 0, wins: 0, losses: 0, totalPnl: 0 };
       const recentLearnings = (this.memory.polymarketLearnings || []).slice(-5).join("\n");
       
-      // Extract per-trade amount from strategy (e.g., "$4 per trade" or "$4 per bet")
-      // If "per trade" is mentioned, use that amount directly. Otherwise, divide total budget by 10.
-      const perTradeMatch = this.polymarketStrategy.match(/\$(\d+)\s*(?:per\s+trade|per\s+bet)/i);
-      let perTradeAmount: number;
-      let totalBudget: number;
+      // DYNAMIC BET SIZING based on risk management
+      // Get Polygon balance from Bankr
+      const balanceResult = await this.bankrPrompt("Show my USDC and USDC.e balance on Polygon only. Just the numbers.");
+      let polygonBalance = 100; // Default fallback
       
-      if (perTradeMatch) {
-        // User specified "$X per trade" — use it directly
-        perTradeAmount = parseInt(perTradeMatch[1]);
-        totalBudget = perTradeAmount; // For logging purposes
-      } else {
-        // User specified total budget — divide into trades
-        const budgetMatch = this.polymarketStrategy.match(/\$(\d+)/);
-        totalBudget = budgetMatch ? parseInt(budgetMatch[1]) : 100;
-        
-        // Survival mode: if user says "life depends on it", "last dollar", "can't lose" etc.
-        // Use smaller bets (budget/20) for maximum capital preservation
-        const isSurvivalMode = /life\s+depends|last\s+\$|can'?t\s+lose|protect\s+capital|survive|last\s+\d+/i.test(this.polymarketStrategy);
-        const divisor = isSurvivalMode ? 20 : 10;
-        perTradeAmount = Math.max(1, Math.floor(totalBudget / divisor));
-        
-        if (isSurvivalMode) {
-          console.log("🛡️ SURVIVAL MODE: Extra conservative — smaller bets, more selective");
+      if (balanceResult.success && balanceResult.response) {
+        // Try to extract balance from response (e.g., "USDC: 11.84" or "11.84 USDC")
+        const balMatch = balanceResult.response.match(/(\d+\.?\d*)/);
+        if (balMatch) {
+          polygonBalance = parseFloat(balMatch[1]);
         }
       }
       
+      // Calculate win rate
+      const winRate = stats.totalBets > 0 ? stats.wins / stats.totalBets : 0.5;
+      
+      // Detect survival mode
+      const isSurvivalMode = /life\s+depends|last\s+\$|can'?t\s+lose|protect\s+capital|survive|last\s+\d+/i.test(this.polymarketStrategy);
+      
+      // Risk factor: how aggressive to bet
+      // Survival mode = 0.5 (very conservative), Normal = 1.0, Winning streak = 1.5
+      let riskFactor = 1.0;
+      if (isSurvivalMode) {
+        riskFactor = 0.5;
+        console.log("🛡️ SURVIVAL MODE: Extra conservative bet sizing");
+      } else if (winRate > 0.6 && stats.totalBets >= 5) {
+        riskFactor = 1.5; // Increase bets when winning
+        console.log("📈 WINNING STREAK: Increasing bet size");
+      } else if (winRate < 0.4 && stats.totalBets >= 5) {
+        riskFactor = 0.6; // Reduce bets when losing
+        console.log("� LOSING STREAK: Reducing bet size");
+      }
+      
+      // Kelly Criterion-inspired: bet size = balance * edge * risk_factor
+      // Edge = win_rate - 0.5 (how much better than 50/50)
+      // Cap at 5% of balance per bet for safety
+      const edge = Math.max(0.1, winRate - 0.5); // Minimum 0.1 edge assumption
+      let perTradeAmount = Math.floor(polygonBalance * edge * riskFactor);
+      perTradeAmount = Math.max(1, Math.min(perTradeAmount, polygonBalance * 0.05)); // Min $1, max 5% of balance
+      
       console.log("🎯 Autonomous Polymarket scan: executing strategy...");
-      console.log(`   Per-trade amount: $${perTradeAmount}`);
+      console.log(`   Polygon balance: $${polygonBalance.toFixed(2)}`);
+      console.log(`   Win rate: ${(winRate * 100).toFixed(0)}% | Edge: ${(edge * 100).toFixed(0)}%`);
+      console.log(`   Risk factor: ${riskFactor.toFixed(1)}x`);
+      console.log(`   Calculated bet: $${perTradeAmount}`);
 
       // Loss streak protection: reduce bet or skip after consecutive losses
       const recentTrades = (this.memory.polymarketTrades || []).slice(-5);
