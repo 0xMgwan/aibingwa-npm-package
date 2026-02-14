@@ -49,6 +49,9 @@ export class AutonomousTrader {
   private isMonitoring = false;
   private polymarketStrategy: string | null = null;
   private polymarketScanIntervalMin = 15;
+  private cachedPolygonBalance: number = 100;
+  private balanceCacheTimestamp: number = 0;
+  private balanceCacheTTL: number = 5 * 60 * 1000; // 5 minutes
 
   constructor(bankrPrompt: BankrPromptFn, notify: NotifyFn) {
     this.memory = loadMemory();
@@ -393,16 +396,26 @@ export class AutonomousTrader {
       const recentLearnings = (this.memory.polymarketLearnings || []).slice(-5).join("\n");
       
       // DYNAMIC BET SIZING based on risk management
-      // Get Polygon balance from Bankr
-      const balanceResult = await this.bankrPrompt("Show my USDC and USDC.e balance on Polygon only. Just the numbers.");
-      let polygonBalance = 100; // Default fallback
+      // Use cached balance to avoid extra Bankr call (refresh every 5 min)
+      const now = Date.now();
+      let polygonBalance = this.cachedPolygonBalance;
       
-      if (balanceResult.success && balanceResult.response) {
-        // Try to extract balance from response (e.g., "USDC: 11.84" or "11.84 USDC")
-        const balMatch = balanceResult.response.match(/(\d+\.?\d*)/);
-        if (balMatch) {
-          polygonBalance = parseFloat(balMatch[1]);
+      if (now - this.balanceCacheTimestamp > this.balanceCacheTTL) {
+        // Cache is stale — refresh balance
+        console.log("🔄 Refreshing Polygon balance cache...");
+        const balanceResult = await this.bankrPrompt("Show my USDC and USDC.e balance on Polygon only. Just the numbers.");
+        
+        if (balanceResult.success && balanceResult.response) {
+          const balMatch = balanceResult.response.match(/(\d+\.?\d*)/);
+          if (balMatch) {
+            this.cachedPolygonBalance = parseFloat(balMatch[1]);
+            this.balanceCacheTimestamp = now;
+            polygonBalance = this.cachedPolygonBalance;
+            console.log(`✅ Balance cache updated: $${polygonBalance.toFixed(2)}`);
+          }
         }
+      } else {
+        console.log(`💾 Using cached balance: $${polygonBalance.toFixed(2)} (${Math.floor((this.balanceCacheTTL - (now - this.balanceCacheTimestamp)) / 60000)}min until refresh)`);
       }
       
       // Calculate win rate

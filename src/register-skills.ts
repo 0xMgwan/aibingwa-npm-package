@@ -395,7 +395,7 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
       if (!isBankrConfigured()) return "Bankr API not configured";
       try {
         const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
-          setTimeout(() => resolve({ success: false, error: "Bankr request timed out after 90s" }), 90000)
+          setTimeout(() => resolve({ success: false, error: "Bankr request timed out after 180s" }), 180000)
         );
         const result = await Promise.race([bankrPrompt(params.prompt), timeoutPromise]);
         return result.success ? result.response || "Done" : `Failed: ${result.error}`;
