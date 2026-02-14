@@ -441,24 +441,20 @@ export class AutonomousTrader {
       }
 
       const scanResult = await this.bankrPrompt(
-        `You are a disciplined Polymarket trading agent. Your goal is PROFITABILITY, not activity.\n\n` +
-        `STRATEGY: ${this.polymarketStrategy}\n\n` +
-        `BET AMOUNT: $${adjustedAmount} per trade.${skipMessage}\n\n` +
-        `PAST PERFORMANCE:\n` +
-        `- Total bets: ${stats.totalBets} | Wins: ${stats.wins} | Losses: ${stats.losses}\n` +
-        `- Win rate: ${stats.totalBets > 0 ? ((stats.wins / stats.totalBets) * 100).toFixed(0) : "N/A"}%\n` +
-        `- P&L: $${stats.totalPnl.toFixed(2)}\n` +
-        `- Consecutive losses: ${consecutiveLosses}\n` +
-        `- Recent learnings:\n${recentLearnings || "No learnings yet — first scan."}\n\n` +
-        `CRITICAL RULES FOR PROFITABILITY:\n` +
-        `1. ONLY bet when you see a CLEAR EDGE — odds that are mispriced or strong momentum in one direction\n` +
-        `2. If odds are close to 50/50 (between 45%-55%), DO NOT BET. Say "SKIP: No clear edge found" instead\n` +
-        `3. Look for markets where one side has 55%+ probability — that's where the edge is\n` +
-        `4. Check recent price movement/momentum before betting — bet WITH the trend, not against it\n` +
-        `5. If you've been losing, SWITCH your approach entirely — different markets, different sides, different timeframes\n` +
-        `6. NEVER bet just because you can. Skipping is a valid and smart decision.\n` +
-        `7. If you find a good edge, PLACE THE BET for $${adjustedAmount}. If not, respond with "SKIP: [reason]"\n` +
-        `8. Report: market name, side chosen, odds, WHY you think this has an edge, and amount bet`
+        `EXECUTE NOW — ONE-SHOT TRADE. Do NOT schedule or create recurring commands. Just find a market and place ONE bet right now.\n\n` +
+        `Search Polymarket for the best opportunity matching this strategy: ${this.polymarketStrategy}\n\n` +
+        `BET AMOUNT: $${adjustedAmount}${skipMessage}\n\n` +
+        `MY TRACK RECORD:\n` +
+        `- ${stats.totalBets} bets so far | ${stats.wins}W/${stats.losses}L | Win rate: ${stats.totalBets > 0 ? ((stats.wins / stats.totalBets) * 100).toFixed(0) : "N/A"}%\n` +
+        `- P&L: $${stats.totalPnl.toFixed(2)} | Consecutive losses: ${consecutiveLosses}\n` +
+        `- Learnings:\n${recentLearnings || "First scan — no learnings yet."}\n\n` +
+        `RULES:\n` +
+        `1. Find ONE market right now with a clear edge (odds > 55% one side, or strong momentum)\n` +
+        `2. If all markets are ~50/50 (45-55%), respond with "SKIP: No clear edge found" — do NOT force a bad bet\n` +
+        `3. If you find an edge, PLACE THE BET for $${adjustedAmount} immediately\n` +
+        `4. Bet WITH momentum/trend, not against it\n` +
+        `5. Report: market name, side, odds, edge reasoning, amount\n` +
+        `6. Do NOT schedule anything. Do NOT create recurring tasks. Just execute ONE trade NOW.`
       );
 
       if (!scanResult.success) {
