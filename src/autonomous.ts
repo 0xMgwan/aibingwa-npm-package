@@ -448,13 +448,18 @@ export class AutonomousTrader {
         `- ${stats.totalBets} bets so far | ${stats.wins}W/${stats.losses}L | Win rate: ${stats.totalBets > 0 ? ((stats.wins / stats.totalBets) * 100).toFixed(0) : "N/A"}%\n` +
         `- P&L: $${stats.totalPnl.toFixed(2)} | Consecutive losses: ${consecutiveLosses}\n` +
         `- Learnings:\n${recentLearnings || "First scan — no learnings yet."}\n\n` +
+        `STRICT CONSTRAINTS:\n` +
+        `- ONLY use funds on Polygon. Use USDC.e on Polygon for bets.\n` +
+        `- Do NOT swap tokens. Do NOT bridge from other chains. Do NOT touch Base, Solana, or Ethereum funds.\n` +
+        `- If Polygon USDC.e balance is insufficient, respond with "SKIP: Insufficient Polygon balance" — do NOT bridge or swap to get funds.\n` +
+        `- ONLY action allowed: place a Polymarket bet using existing Polygon USDC.e.\n\n` +
         `RULES:\n` +
         `1. Find ONE market right now with a clear edge (odds > 55% one side, or strong momentum)\n` +
         `2. If all markets are ~50/50 (45-55%), respond with "SKIP: No clear edge found" — do NOT force a bad bet\n` +
-        `3. If you find an edge, PLACE THE BET for $${adjustedAmount} immediately\n` +
+        `3. If you find an edge, PLACE THE BET for $${adjustedAmount} immediately using Polygon USDC.e\n` +
         `4. Bet WITH momentum/trend, not against it\n` +
         `5. Report: market name, side, odds, edge reasoning, amount\n` +
-        `6. Do NOT schedule anything. Do NOT create recurring tasks. Just execute ONE trade NOW.`
+        `6. Do NOT schedule anything. Do NOT create recurring tasks. Do NOT swap or bridge. Just place ONE bet NOW.`
       );
 
       if (!scanResult.success) {

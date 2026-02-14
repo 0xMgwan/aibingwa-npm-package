@@ -121,12 +121,15 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
 
   registry.register({
     name: "get_bankr_balance",
-    description: "Check the Bankr managed wallet balance (separate from AgentKit wallet)",
+    description: "Check the Bankr managed wallet balance across ALL chains (Base, Polygon, Solana, Ethereum, etc.). Use this for any balance query.",
     category: "wallet",
-    parameters: [],
-    execute: async () => {
+    parameters: [
+      { name: "chain", type: "string", description: "Specific chain to check (e.g., 'polygon', 'base', 'solana', 'ethereum'). Leave empty for all chains.", required: false },
+    ],
+    execute: async (params: any) => {
       if (!isBankrConfigured()) return "Bankr API not configured";
-      const result = await bankrPrompt("Show me my account info and wallet balance. Include all tokens and their USD values.");
+      const chainFilter = params.chain ? ` on ${params.chain}` : " across all chains (Base, Polygon, Solana, Ethereum, Arbitrum, Optimism)";
+      const result = await bankrPrompt(`Show me my complete wallet balance${chainFilter}. Include all tokens, their amounts, and USD values. Show every chain.`);
       return result.success ? result.response || "No data" : `Error: ${result.error}`;
     },
   });
