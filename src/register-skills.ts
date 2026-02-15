@@ -386,10 +386,10 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
   // Bankr handles the full flow: find market → analyze → place bet.
   registry.register({
     name: "polymarket",
-    description: "DO ANYTHING on Polymarket — bet, trade, scan markets, check odds, find opportunities. This is the PRIMARY Polymarket skill. Use it whenever the user mentions Polymarket, betting, prediction markets, or wants to place a bet. Pass the user's full request as the prompt. Examples: 'Bet $2 on BTC 15min up', 'Find best 15-minute markets and bet', 'What are the odds on SOL going up?'",
+    description: "Complete Polymarket operations: search markets, check odds, place bets, view positions, redeem winnings, sell shares. Use for ANY Polymarket request. Examples: 'Bet $10 on Yes', 'What are the odds on [event]?', 'Show my positions', 'Redeem my winnings', 'Cash out my resolved bets', 'Search election markets', 'Sell my shares'",
     category: "prediction",
     parameters: [
-      { name: "prompt", type: "string", description: "The full Polymarket action to execute. Be specific: include market name, amount, outcome (Yes/No/Up/Down) if betting. Examples: 'Bet $5 on Yes for BTC 15-minute up/down market', 'Search for trending prediction markets', 'Show my positions'", required: true },
+      { name: "prompt", type: "string", description: "Full Polymarket action. Examples: 'Bet $5 on Yes for [market]', 'Redeem my Polymarket positions', 'Show my active bets', 'What are the odds on Trump winning?', 'Cash out my winnings', 'Sell my shares in [market]'", required: true },
     ],
     execute: async (params: any) => {
       if (!isBankrConfigured()) return "Bankr API not configured";
