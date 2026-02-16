@@ -40,7 +40,7 @@ import { registerAllSkills, type SkillDeps } from "./register-skills.js";
 export interface AgentBingwaConfig {
   /** OpenAI API key for LLM reasoning */
   openaiApiKey?: string;
-  /** OpenAI model to use (default: o1-preview for better reasoning) */
+  /** OpenAI model to use (default: gpt-4.1 for best reasoning) */
   model?: string;
   /** Custom system prompt (use {{SKILLS}}, {{USER_NAME}}, {{INTERACTION_COUNT}} placeholders) */
   systemPrompt?: string;

@@ -43,7 +43,7 @@ export class AgentBrain {
     this.openai = new OpenAI({ apiKey });
     this.skills = skills;
     this.agentMemory = loadMemory();
-    this.model = options?.model || "o1-preview";
+    this.model = options?.model || "gpt-4.1";
     this.systemPromptOverride = options?.systemPrompt;
     console.log(`🧠 Agent brain initialized (${this.model})`);
   }
