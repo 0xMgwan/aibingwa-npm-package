@@ -1,7 +1,18 @@
 import { SkillRegistry } from "./skills.js";
-import { getPerformanceSummary, getOpenPositions, getTradeHistory, loadMemory } from "./memory.js";
+import { AutonomousTrader } from "./autonomous.js";
 import { BankrX402Client } from "./bankr-x402.js";
 import { TwitterClient } from "./twitter.js";
+import {
+  AgentMemory,
+  TradeEntry,
+  loadMemory,
+  saveMemory,
+  getPerformanceSummary,
+  getOpenPositions,
+  getTradeHistory,
+} from "./memory.js";
+import { registerAllOpenClawSkills } from "./openclaw-skills.js";
+import { registerAllAdvancedSkills } from "./advanced-skills.js";
 
 // ============================================================
 // REGISTER ALL SKILLS — Called once at startup
@@ -908,6 +919,20 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
       },
     });
   }
+
+  // ── OPENCLAW SKILLS ──────────────────────────────────────
+  // Register all OpenClaw ecosystem skills (Botchan, Clanker, Endaoment, etc.)
+  registerAllOpenClawSkills(registry, {
+    bankrPrompt: deps.bankrPrompt,
+    executeAction: deps.executeAction,
+    getWalletAddress: deps.getWalletAddress,
+  });
+
+  // ── ADVANCED SKILLS ──────────────────────────────────────
+  // Register advanced capabilities (Email, Calendar, Web, Files, AI Analysis)
+  registerAllAdvancedSkills(registry, {
+    bankrPrompt: deps.bankrPrompt,
+  });
 
   console.log(`✅ Registered ${registry.getAll().length} skills`);
 }
