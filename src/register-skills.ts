@@ -13,6 +13,7 @@ import {
 } from "./memory.js";
 import { registerAllOpenClawSkills } from "./openclaw-skills.js";
 import { registerAllAdvancedSkills } from "./advanced-skills.js";
+import { registerAllRealWorldSkills } from "./real-world-skills.js";
 
 // ============================================================
 // REGISTER ALL SKILLS — Called once at startup
@@ -931,6 +932,12 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
   // ── ADVANCED SKILLS ──────────────────────────────────────
   // Register advanced capabilities (Email, Calendar, Web, Files, AI Analysis)
   registerAllAdvancedSkills(registry, {
+    bankrPrompt: deps.bankrPrompt,
+  });
+
+  // ── REAL WORLD EXECUTION ─────────────────────────────────
+  // Register actual execution skills (Weather, Real Email/Calendar, Enhanced Polymarket, Learning)
+  registerAllRealWorldSkills(registry, {
     bankrPrompt: deps.bankrPrompt,
   });
 
