@@ -4,6 +4,7 @@
 
 import { SkillRegistry } from "./skills.js";
 import { CredentialManager, parseGmailCredentials, parseCalendarCredentials, parseWeatherCredentials } from "./credential-manager.js";
+import { IntelligentCredentialParser } from "./intelligent-credential-parser.js";
 
 export interface DynamicSkillDeps {
   bankrPrompt?: (prompt: string) => Promise<{ success: boolean; response?: string; error?: string }>;
@@ -15,11 +16,11 @@ export interface DynamicSkillDeps {
 export function registerCredentialSkills(registry: SkillRegistry, deps: DynamicSkillDeps) {
   registry.register({
     name: "store_credentials",
-    description: "Store login credentials for services like Gmail, Google Calendar, etc. Just tell me your credentials and I'll store them securely.",
+    description: "Store login credentials for services like Gmail, Google Calendar, etc. Just tell me your credentials in any natural format and I'll understand them.",
     category: "utility",
     parameters: [
       { name: "service", type: "string", description: "Service name (gmail, calendar, weather, etc.)", required: true },
-      { name: "credentials", type: "string", description: "Credential information (email, password, API keys, etc.)", required: true },
+      { name: "credentials", type: "string", description: "Credential information in any natural format", required: true },
       { name: "user_id", type: "string", description: "User identifier", required: true },
     ],
     execute: async (params: any) => {
@@ -27,60 +28,23 @@ export function registerCredentialSkills(registry: SkillRegistry, deps: DynamicS
       
       let parsedCreds;
       
-      switch (service.toLowerCase()) {
-        case 'gmail':
-        case 'email':
-          parsedCreds = parseGmailCredentials(credentials);
-          if (parsedCreds) {
-            CredentialManager.setCredentials(user_id, 'gmail', parsedCreds);
-            return `✅ **Gmail credentials stored securely**\n\n` +
-                   `**Email**: ${parsedCreds.email}\n` +
-                   `**Status**: Ready for email operations\n\n` +
-                   `You can now use commands like:\n` +
-                   `• "Send email to john@company.com"\n` +
-                   `• "Check my emails"\n` +
-                   `• "Send trading report to my team"`;
-          }
-          break;
-          
-        case 'calendar':
-        case 'google_calendar':
-          parsedCreds = parseCalendarCredentials(credentials);
-          if (parsedCreds) {
-            CredentialManager.setCredentials(user_id, 'calendar', parsedCreds);
-            return `✅ **Google Calendar credentials stored**\n\n` +
-                   `**API Key**: ${parsedCreds.apiKey.substring(0, 8)}...\n` +
-                   `**Status**: Ready for calendar operations\n\n` +
-                   `You can now use commands like:\n` +
-                   `• "Remind me to check portfolio at 2pm"\n` +
-                   `• "Schedule meeting with team tomorrow"\n` +
-                   `• "What's on my calendar today?"`;
-          }
-          break;
-          
-        case 'weather':
-          parsedCreds = parseWeatherCredentials(credentials);
-          if (parsedCreds) {
-            CredentialManager.setCredentials(user_id, 'weather', parsedCreds);
-            return `✅ **Weather API credentials stored**\n\n` +
-                   `**API Key**: ${parsedCreds.apiKey.substring(0, 8)}...\n` +
-                   `**Status**: Ready for enhanced weather data`;
-          }
-          break;
-          
-        default:
-          // Generic credential storage
-          CredentialManager.setCredentials(user_id, service, { raw: credentials });
-          return `✅ **${service} credentials stored**\n\n` +
-                 `**Service**: ${service}\n` +
-                 `**Status**: Stored securely for future use`;
+      // Use intelligent parsing that understands natural language like Claude
+      parsedCreds = IntelligentCredentialParser.parseCredentials(credentials, service);
+      
+      if (parsedCreds) {
+        CredentialManager.setCredentials(user_id, service, parsedCreds);
+        const summary = IntelligentCredentialParser.getSummary(parsedCreds);
+        
+        return `✅ **${service} credentials stored securely**\n\n` +
+               `**Detected**: ${summary}\n` +
+               `**Status**: Ready for operations\n\n` +
+               `You can now use all ${service} features!`;
       }
       
-      return `❌ **Could not parse ${service} credentials**\n\n` +
-             `Please provide credentials in a clear format, for example:\n` +
-             `• Gmail: "email: john@gmail.com password: abcd1234efgh5678"\n` +
-             `• Calendar: "api_key: AIzaSyB..."\n` +
-             `• Weather: "weather_key: abc123..."`;
+      // If intelligent parsing failed, still store raw and be helpful
+      CredentialManager.setCredentials(user_id, service, { raw: credentials });
+      return `✅ **${service} credentials stored**\n\n` +
+             `I've saved your credentials. They'll be used when you request ${service} operations.`;
     },
   });
 

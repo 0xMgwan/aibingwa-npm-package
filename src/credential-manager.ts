@@ -70,22 +70,46 @@ export class CredentialManager {
   }
 }
 
-// Helper functions for credential parsing
+// Helper functions for credential parsing - Claude-style intelligence
 export function parseGmailCredentials(input: string): any {
-  // Parse various Gmail credential formats
-  const patterns = [
-    /email:\s*([^\s,]+).*?password:\s*([^\s,]+)/i,
-    /gmail:\s*([^\s,]+).*?pass:\s*([^\s,]+)/i,
-    /([^\s@]+@[^\s,]+).*?([a-zA-Z0-9]{16})/,  // email and app password
+  // Extract email addresses
+  const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+  const emails = input.match(emailPattern);
+  
+  if (!emails || emails.length === 0) return null;
+  
+  const email = emails[0]; // Use first email found
+  
+  // Extract passwords/app passwords - much more flexible patterns
+  const passwordPatterns = [
+    // Explicit password mentions
+    /password[:\s]+([a-zA-Z0-9]{8,})/i,
+    /pass[:\s]+([a-zA-Z0-9]{8,})/i,
+    /app[_\s]?password[:\s]+([a-zA-Z0-9]{8,})/i,
+    
+    // After email, look for password-like strings
+    new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[:\\s,]+([a-zA-Z0-9]{8,})', 'i'),
+    
+    // Common formats: email:password, email password, email,password
+    /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}[:\s,]+([a-zA-Z0-9]{8,})/,
+    
+    // Just look for any 16+ character alphanumeric string (typical app password length)
+    /([a-zA-Z0-9]{16,})/,
+    
+    // Look for any 8+ character string that could be a password
+    /([a-zA-Z0-9]{8,})/,
   ];
 
-  for (const pattern of patterns) {
+  for (const pattern of passwordPatterns) {
     const match = input.match(pattern);
-    if (match) {
-      return {
-        email: match[1],
-        appPassword: match[2],
-      };
+    if (match && match[1]) {
+      // Validate it's not the email itself
+      if (match[1] !== email && !match[1].includes('@')) {
+        return {
+          email: email,
+          appPassword: match[1],
+        };
+      }
     }
   }
 
