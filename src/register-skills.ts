@@ -15,6 +15,7 @@ import { registerAllOpenClawSkills } from "./openclaw-skills.js";
 import { registerAllAdvancedSkills } from "./advanced-skills.js";
 import { registerAllRealWorldSkills } from "./real-world-skills.js";
 import { registerAllDynamicSkills } from "./dynamic-execution-skills.js";
+import { registerAllIntelligentAutomation } from "./intelligent-automation.js";
 
 // ============================================================
 // REGISTER ALL SKILLS — Called once at startup
@@ -945,6 +946,12 @@ export function registerAllSkills(registry: SkillRegistry, deps: SkillDeps): voi
   // ── DYNAMIC CREDENTIALS ──────────────────────────────────
   // Register Claude-style credential management (store credentials via chat, execute immediately)
   registerAllDynamicSkills(registry, {
+    bankrPrompt: deps.bankrPrompt,
+  });
+
+  // ── INTELLIGENT AUTOMATION ───────────────────────────────
+  // Register real email execution, booking automation, and cron job management
+  registerAllIntelligentAutomation(registry, {
     bankrPrompt: deps.bankrPrompt,
   });
 

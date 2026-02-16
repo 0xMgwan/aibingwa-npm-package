@@ -61,6 +61,11 @@
     "url": "https://github.com/0xMgwan/aibingwa-package/issues"
   },
   "dependencies": {
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^7.0.10",
+    "googleapis": "^171.4.0",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.1",
     "openai": "^6.21.0",
     "tsup": "^8.4.0",
     "twitter-api-v2": "^1.29.0",
