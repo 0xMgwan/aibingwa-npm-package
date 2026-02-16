@@ -23,19 +23,26 @@ export class RealGmailAPI {
   }
 
   private setupTransporter() {
-    // Use Gmail SMTP with app password for reliable sending
-    this.transporter = nodemailer.createTransporter({
-      service: 'gmail',
+    // Use Gmail SMTP with explicit configuration for better reliability
+    this.transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // true for 465, false for other ports
       auth: {
         user: this.credentials.email,
         pass: this.credentials.appPassword,
       },
+      tls: {
+        rejectUnauthorized: false
+      }
     });
   }
 
   // Actually send email via Gmail SMTP
   async sendEmail(to: string, subject: string, body: string, html?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      console.log(`📧 Attempting to send email from ${this.credentials.email} to ${to}`);
+      
       const mailOptions = {
         from: this.credentials.email,
         to: to,
@@ -46,14 +53,28 @@ export class RealGmailAPI {
 
       const result = await this.transporter.sendMail(mailOptions);
       
+      console.log(`✅ Email sent successfully: ${result.messageId}`);
       return {
         success: true,
         messageId: result.messageId,
       };
-    } catch (error) {
+    } catch (error: any) {
+      console.error(`❌ Gmail SMTP Error:`, error);
+      
+      let errorMessage = `Gmail SMTP failed: ${error.message || error}`;
+      
+      // Provide specific guidance based on error type
+      if (error.code === 'EAUTH' || error.responseCode === 535) {
+        errorMessage += `\n\n🔑 Authentication failed. Please:\n1. Enable 2FA on Gmail\n2. Generate App Password at myaccount.google.com/apppasswords\n3. Use the 16-character app password (not your regular password)`;
+      } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
+        errorMessage += `\n\n🌐 Connection failed. Check your internet connection.`;
+      } else if (error.code === 'EMESSAGE') {
+        errorMessage += `\n\n📝 Message format issue. Check recipient email format.`;
+      }
+      
       return {
         success: false,
-        error: `Failed to send email: ${error}`,
+        error: errorMessage,
       };
     }
   }
