@@ -40,6 +40,20 @@ export function registerRealEmailExecution(registry: SkillRegistry, deps: Automa
 
       try {
         const gmailAPI = new RealGmailAPI(creds);
+        
+        // Test connection first
+        const connectionTest = await gmailAPI.testConnection();
+        if (!connectionTest.success) {
+          return `❌ **Gmail connection failed**\n\n` +
+                 `**Error**: ${connectionTest.error}\n\n` +
+                 `**Fix this**:\n` +
+                 `1. Go to https://myaccount.google.com/apppasswords\n` +
+                 `2. Generate a new App Password for "Mail"\n` +
+                 `3. Use that 16-character password (not your regular Gmail password)\n` +
+                 `4. Make sure 2-Factor Authentication is enabled\n\n` +
+                 `**Current credentials**: ${creds.email} with ${creds.appPassword?.length || 0}-character password`;
+        }
+        
         const result = await gmailAPI.sendEmail(to, subject, body);
         
         if (result.success) {
@@ -53,15 +67,17 @@ export function registerRealEmailExecution(registry: SkillRegistry, deps: Automa
         } else {
           return `❌ **Email failed to send**\n\n` +
                  `**Error**: ${result.error}\n\n` +
-                 `**Troubleshooting**:\n` +
-                 `• Verify your app password is correct\n` +
-                 `• Check if 2FA is enabled on Gmail\n` +
-                 `• Ensure "Less secure app access" is enabled`;
+                 `**Common fixes**:\n` +
+                 `• Use App Password (16 chars) not regular password\n` +
+                 `• Enable 2FA on Gmail first\n` +
+                 `• Generate new App Password at myaccount.google.com/apppasswords\n` +
+                 `• Try: "mgwani96@gmail.com abcdefghijklmnop" (with real app password)`;
         }
       } catch (error) {
         return `❌ **Email sending error**\n\n` +
                `**Error**: ${error}\n\n` +
-               `Please check your Gmail credentials and try again.`;
+               `**Debug info**: Email: ${creds.email}, Password length: ${creds.appPassword?.length || 0}\n\n` +
+               `Most likely: You need a Gmail App Password, not your regular password.`;
       }
     },
   });
