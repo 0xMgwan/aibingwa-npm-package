@@ -38,9 +38,9 @@ import { registerAllSkills, type SkillDeps } from "./register-skills.js";
 // ============================================================
 
 export interface AgentBingwaConfig {
-  /** OpenAI API key for LLM reasoning */
-  openaiApiKey?: string;
-  /** OpenAI model to use (default: gpt-4.1 for best reasoning) */
+  /** Anthropic API key for Claude LLM reasoning */
+  anthropicApiKey?: string;
+  /** Claude model to use (default: claude-3-5-sonnet-20241022 - most intelligent) */
   model?: string;
   /** Custom system prompt (use {{SKILLS}}, {{USER_NAME}}, {{INTERACTION_COUNT}} placeholders) */
   systemPrompt?: string;
@@ -103,7 +103,7 @@ export class AgentBingwa {
     }
 
     // Initialize brain
-    const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY;
+    const apiKey = config.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
     if (apiKey) {
       try {
         this.brain = new AgentBrain(this.skills, {

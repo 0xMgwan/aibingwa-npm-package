@@ -63,6 +63,28 @@ export class SkillRegistry {
     }));
   }
 
+  // Convert skills to Claude tool format
+  toClaudeTools(): any[] {
+    return this.getAll().map(skill => ({
+      name: skill.name,
+      description: skill.description,
+      input_schema: {
+        type: "object",
+        properties: Object.fromEntries(
+          skill.parameters.map(p => [
+            p.name,
+            {
+              type: p.type,
+              description: p.description,
+              ...(p.enum ? { enum: p.enum } : {}),
+            },
+          ])
+        ),
+        required: skill.parameters.filter(p => p.required).map(p => p.name),
+      },
+    }));
+  }
+
   // Get a human-readable skill list for the system prompt
   describeSkills(): string {
     const categories = new Map<string, Skill[]>();

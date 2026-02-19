@@ -61,6 +61,7 @@
     "url": "https://github.com/0xMgwan/aibingwa-package/issues"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.77.0",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.10",
     "googleapis": "^171.4.0",

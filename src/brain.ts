@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { SkillRegistry } from "./skills.js";
 import {
   AgentMemory,
@@ -28,7 +28,7 @@ interface UserProfile {
 // AGENT BRAIN — LLM-powered reasoning engine
 // ============================================================
 export class AgentBrain {
-  private openai: OpenAI;
+  private anthropic: Anthropic;
   private skills: SkillRegistry;
   private users: Map<string, UserProfile> = new Map();
   private agentMemory: AgentMemory;
@@ -36,16 +36,16 @@ export class AgentBrain {
   private systemPromptOverride?: string;
 
   constructor(skills: SkillRegistry, options?: { model?: string; apiKey?: string; systemPrompt?: string }) {
-    const apiKey = options?.apiKey || process.env.OPENAI_API_KEY;
+    const apiKey = options?.apiKey || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is required for the agent brain");
+      throw new Error("ANTHROPIC_API_KEY is required for the agent brain");
     }
-    this.openai = new OpenAI({ apiKey });
+    this.anthropic = new Anthropic({ apiKey });
     this.skills = skills;
     this.agentMemory = loadMemory();
-    this.model = options?.model || "gpt-4.1";
+    this.model = options?.model || "claude-3-5-sonnet-20241022";
     this.systemPromptOverride = options?.systemPrompt;
-    console.log(`🧠 Agent brain initialized (${this.model})`);
+    console.log(`🧠 Agent brain initialized with Claude (${this.model})`);
   }
 
   // ── SYSTEM PROMPT ────────────────────────────────────────
@@ -160,11 +160,13 @@ When asked to find opportunities or trade:
 - NEVER ask "Would you like me to...?" or "Shall I...?" for clear action commands — JUST DO IT
 - NEVER say "I can't execute" or "I don't have direct access" — you DO. USE YOUR SKILLS.
 
-**CRITICAL: RESPECT PAUSE/STOP COMMANDS**
-- If user says "pause", "stop", "wait", "hold on", "don't execute" — DO NOT execute any trades or actions
-- If user says "pause auto-trading" or "stop autonomous trading" — acknowledge and explain how to disable it
-- Match Bankr terminal behavior: execute when commanded, pause when asked to pause
-- The user controls execution timing — respect their commands
+**CRITICAL: RESPECT PAUSE/STOP COMMANDS - HIGHEST PRIORITY**
+- If user says "stop", "pause", "halt", "stop trading", "stop scanning", "disable auto-trade" — IMMEDIATELY use toggle_auto_trade skill with enabled=false AND stop_autonomous_trading skill
+- When user says stop, you MUST execute the stop action, not just acknowledge
+- Use these skills to actually stop: toggle_auto_trade(false), stop_autonomous_trading
+- After stopping, confirm: "✅ Trading stopped. Auto-trade disabled. Market scanning halted."
+- NEVER just say "I understand" or "noted" — actually execute the stop command
+- The user controls execution timing — when they say stop, you STOP IMMEDIATELY
 
 **EXECUTE REAL TASKS - DON'T JUST EXPLAIN**
 - When user asks for weather → Use get_weather skill and provide actual data
@@ -300,61 +302,94 @@ Your Bankr integration gives you COMPLETE access to everything Bankr terminal ca
       const MAX_TOOL_ROUNDS = 5;
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        const response = await this.openai.chat.completions.create({
+        // Extract system message for Claude (it uses separate system parameter)
+        const systemMessage = messages.find(m => m.role === "system")?.content || "";
+        const conversationMessages = messages.filter(m => m.role !== "system");
+
+        const response = await this.anthropic.messages.create({
           model: this.model,
-          messages,
-          tools: this.skills.toOpenAITools(),
-          tool_choice: "auto",
+          max_tokens: 4096,
+          system: systemMessage,
+          messages: conversationMessages,
+          tools: this.skills.toClaudeTools(),
           temperature: 0.5,
-          max_tokens: 800,
         });
 
-        const choice = response.choices[0];
-        const toolCalls = choice.message.tool_calls;
+        const content: any = response.content;
+        const textBlock = content.find((block: any) => block.type === "text");
+        const toolUseBlocks = content.filter((block: any) => block.type === "tool_use");
 
-        if (!toolCalls || toolCalls.length === 0) {
+        if (toolUseBlocks.length === 0) {
           // No more tool calls — we have the final text response
-          assistantMessage = choice.message.content || "Done!";
+          assistantMessage = (textBlock as any)?.text || "Done!";
           break;
         }
 
-        // Execute all tool calls in this round
-        messages.push(choice.message);
+        // Add assistant message with tool use to conversation
+        messages.push({
+          role: "assistant",
+          content: content,
+        });
 
-        const toolPromises = toolCalls.map(async (toolCall) => {
-          const tc = toolCall as any;
-          const skillName = tc.function?.name;
-          const skill = skillName ? this.skills.get(skillName) : undefined;
+        // Execute all tool calls in this round
+        const toolResults: any[] = [];
+        
+        for (const toolUse of toolUseBlocks) {
+          const skillName = (toolUse as any).name;
+          const skill = this.skills.get(skillName);
 
           if (skill) {
             try {
-              const params = JSON.parse(tc.function.arguments || "{}");
+              const params = (toolUse as any).input || {};
               console.log(`🔧 Executing skill: ${skillName}`, params);
               if (statusCallback) await statusCallback(`🔧 Running: ${skillName}...`).catch(() => {});
               const result = await skill.execute(params);
-              return { role: "tool" as const, tool_call_id: toolCall.id, content: result };
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: (toolUse as any).id,
+                content: result,
+              });
             } catch (err: any) {
-              return { role: "tool" as const, tool_call_id: toolCall.id, content: `Error: ${err.message}` };
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: (toolUse as any).id,
+                content: `Error: ${err.message}`,
+                is_error: true,
+              });
             }
+          } else {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: (toolUse as any).id,
+              content: `Unknown skill: ${skillName}`,
+              is_error: true,
+            });
           }
-          return { role: "tool" as const, tool_call_id: toolCall.id, content: `Unknown skill: ${skillName}` };
-        });
+        }
 
-        const toolResults = await Promise.all(toolPromises);
-        messages.push(...toolResults);
+        messages.push({
+          role: "user",
+          content: toolResults,
+        });
 
         if (statusCallback) await statusCallback("🧠 Analyzing results...").catch(() => {});
       }
 
       // If we exhausted all rounds without a text response, get one now
       if (!assistantMessage) {
-        const finalResponse = await this.openai.chat.completions.create({
+        const systemMessage = messages.find(m => m.role === "system")?.content || "";
+        const conversationMessages = messages.filter(m => m.role !== "system");
+        
+        const finalResponse = await this.anthropic.messages.create({
           model: this.model,
-          messages,
+          max_tokens: 4096,
+          system: systemMessage,
+          messages: conversationMessages,
           temperature: 0.5,
-          max_tokens: 800,
         });
-        assistantMessage = finalResponse.choices[0].message.content || "Done!";
+        
+        const textBlock = finalResponse.content.find((block: any) => block.type === "text");
+        assistantMessage = (textBlock as any)?.text || "Done!";
       }
 
       user.conversationHistory.push({
@@ -374,7 +409,7 @@ Your Bankr integration gives you COMPLETE access to everything Bankr terminal ca
       console.error("🧠 Brain error:", err.message);
 
       if (err.message?.includes("API key")) {
-        return "⚠️ My brain isn't connected yet. Add OPENAI_API_KEY to env vars to enable AI reasoning.";
+        return "⚠️ My brain isn't connected yet. Add ANTHROPIC_API_KEY to env vars to enable Claude AI reasoning.";
       }
       return `Hmm, my brain glitched 🤔 Error: ${err.message}\n\nTry again or use a direct command.`;
     }
@@ -432,14 +467,15 @@ Reflect on this interaction. In 1-2 sentences, capture:
 
 If nothing meaningful, respond with "nothing".`;
 
-      const result = await this.openai.chat.completions.create({
+      const result = await this.anthropic.messages.create({
         model: this.model,
+        max_tokens: 150,
         messages: [{ role: "user", content: reflectionPrompt }],
         temperature: 0.3,
-        max_tokens: 150,
       });
 
-      const reflection = result.choices[0].message.content || "";
+      const textBlock = result.content.find((block: any) => block.type === "text");
+      const reflection = (textBlock as any)?.text || "";
       if (reflection.toLowerCase() !== "nothing" && reflection.length > 5) {
         this.agentMemory.learnings.push(`[${new Date().toISOString().slice(0, 10)}] ${reflection}`);
         if (this.agentMemory.learnings.length > 100) {
