@@ -43,7 +43,7 @@ export class AgentBrain {
     this.anthropic = new Anthropic({ apiKey });
     this.skills = skills;
     this.agentMemory = loadMemory();
-    this.model = options?.model || "claude-3-haiku-20240307";
+    this.model = options?.model || "claude-sonnet-4-6";
     this.systemPromptOverride = options?.systemPrompt;
     console.log(`🧠 Agent brain initialized with Claude (${this.model})`);
   }
