@@ -40,7 +40,7 @@ import { registerAllSkills, type SkillDeps } from "./register-skills.js";
 export interface AgentBingwaConfig {
   /** Anthropic API key for Claude LLM reasoning */
   anthropicApiKey?: string;
-  /** Claude model to use (default: claude-3-5-sonnet-20241022 - most intelligent) */
+  /** Claude model to use (default: claude-3-5-sonnet-20240620 - most intelligent) */
   model?: string;
   /** Custom system prompt (use {{SKILLS}}, {{USER_NAME}}, {{INTERACTION_COUNT}} placeholders) */
   systemPrompt?: string;
