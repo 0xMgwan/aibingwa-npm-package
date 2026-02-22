@@ -14,13 +14,13 @@ export interface PolymarketConfig {
 }
 
 export const DEFAULT_POLYMARKET_CONFIG: PolymarketConfig = {
-  maxBetsPerDay: 10,
-  maxDailyLossUsd: 50,
-  minLiquidityUsd: 1000,
-  maxVolatilityThreshold: 0.15, // 15% max volatility
-  cooldownMinutes: 5,
-  maxPositionSizeUsd: 10,
-  stopLossThreshold: 0.25, // 25% stop loss
+  maxBetsPerDay: 50, // More flexible
+  maxDailyLossUsd: 500, // Higher limit
+  minLiquidityUsd: 100, // Much lower - allow smaller markets
+  maxVolatilityThreshold: 0.5, // 50% max volatility - more permissive
+  cooldownMinutes: 1, // Shorter cooldown for fast trading
+  maxPositionSizeUsd: 100, // Higher position size
+  stopLossThreshold: 0.5, // 50% stop loss - less aggressive
 };
 
 export interface MarketData {
@@ -154,19 +154,13 @@ export class PolymarketModule {
    * Pre-screening filters for market quality
    */
   private passesPreScreening(market: MarketData): boolean {
-    // Liquidity check
-    if (market.liquidity < this.config.minLiquidityUsd) return false;
+    // Only check if market is still open (has time left)
+    if (market.endDate - Date.now() < 2 * 60 * 1000) return false; // 2 minutes minimum
     
-    // Volatility check (too volatile = unpredictable)
+    // Optional: Skip markets with extreme volatility (but allow most)
     if (market.volatility > this.config.maxVolatilityThreshold) return false;
     
-    // Time check (must have at least 10 minutes left)
-    if (market.endDate - Date.now() < 10 * 60 * 1000) return false;
-    
-    // Volume check (must have recent activity)
-    if (market.volume24h < 100) return false;
-    
-    return true;
+    return true; // Allow trading on any market that's still open
   }
 
   /**

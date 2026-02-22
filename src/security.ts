@@ -13,12 +13,12 @@ export interface SecurityConfig {
 }
 
 export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
-  maxTradesPerDay: 20,
-  maxDailyLossUsd: 100,
-  maxOpenPositions: 5,
-  cooldownMinutesAfterLossStreak: 30,
-  maxPositionSizePct: 2, // 2% max position size
-  drawdownKillSwitchPct: 20, // 20% drawdown kills auto-trade
+  maxTradesPerDay: 100, // Much higher limit
+  maxDailyLossUsd: 1000, // Higher daily loss limit
+  maxOpenPositions: 10, // More positions allowed
+  cooldownMinutesAfterLossStreak: 5, // Shorter cooldown
+  maxPositionSizePct: 10, // 10% max position size - more flexible
+  drawdownKillSwitchPct: 50, // 50% drawdown before kill switch
 };
 
 /**
