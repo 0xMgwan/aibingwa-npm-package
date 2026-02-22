@@ -54,6 +54,7 @@ export class PolymarketModule {
   };
   private activeBets: Map<string, ActiveBet> = new Map();
   private lastBetTime = 0;
+  private backtestResults: BacktestResult[] = [];
 
   constructor(config: PolymarketConfig = DEFAULT_POLYMARKET_CONFIG) {
     this.config = config;
@@ -310,6 +311,236 @@ export class PolymarketModule {
     ];
   }
 
+  /**
+   * Run backtest against historical data to validate strategy
+   */
+  async runBacktest(
+    historicalData: HistoricalMarketData[],
+    startDate: Date,
+    endDate: Date,
+    initialBalance: number = 1000
+  ): Promise<BacktestSummary> {
+    console.log(`🔄 Running backtest from ${startDate.toDateString()} to ${endDate.toDateString()}`);
+    
+    let balance = initialBalance;
+    let totalTrades = 0;
+    let winningTrades = 0;
+    let totalPnl = 0;
+    const trades: BacktestTrade[] = [];
+    
+    // Filter data by date range
+    const filteredData = historicalData.filter(
+      data => data.timestamp >= startDate.getTime() && data.timestamp <= endDate.getTime()
+    );
+    
+    // Group by market and simulate trading
+    const marketGroups = this.groupByMarket(filteredData);
+    
+    for (const [marketId, marketHistory] of marketGroups) {
+      // Skip markets with insufficient data
+      if (marketHistory.length < 10) continue;
+      
+      // Simulate trading on this market
+      const marketTrades = await this.simulateMarketTrading(marketHistory);
+      
+      for (const trade of marketTrades) {
+        if (balance < trade.amount) continue; // Skip if insufficient balance
+        
+        balance -= trade.amount;
+        totalTrades++;
+        
+        // Calculate outcome based on final price
+        const finalPrice = marketHistory[marketHistory.length - 1];
+        const targetPrice = trade.direction === "yes" ? finalPrice.yesPrice : finalPrice.noPrice;
+        const pnl = this.calculateBacktestPnl(trade, targetPrice);
+        
+        balance += pnl;
+        totalPnl += (pnl - trade.amount);
+        
+        if (pnl > trade.amount) winningTrades++;
+        
+        trades.push({
+          ...trade,
+          outcome: pnl > trade.amount ? "win" : "loss",
+          pnl: pnl - trade.amount,
+          finalPrice: targetPrice,
+        });
+      }
+    }
+    
+    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+    const totalReturn = ((balance - initialBalance) / initialBalance) * 100;
+    
+    const summary: BacktestSummary = {
+      startDate,
+      endDate,
+      initialBalance,
+      finalBalance: balance,
+      totalReturn,
+      totalTrades,
+      winningTrades,
+      losingTrades: totalTrades - winningTrades,
+      winRate,
+      totalPnl,
+      avgWin: winningTrades > 0 ? trades.filter(t => t.outcome === "win").reduce((sum, t) => sum + t.pnl, 0) / winningTrades : 0,
+      avgLoss: (totalTrades - winningTrades) > 0 ? trades.filter(t => t.outcome === "loss").reduce((sum, t) => sum + t.pnl, 0) / (totalTrades - winningTrades) : 0,
+      maxDrawdown: this.calculateMaxDrawdown(trades, initialBalance),
+      trades,
+    };
+    
+    this.backtestResults.push({
+      timestamp: Date.now(),
+      summary,
+      config: { ...this.config },
+    });
+    
+    return summary;
+  }
+  
+  /**
+   * Simulate trading on a single market's historical data
+   */
+  private async simulateMarketTrading(marketHistory: HistoricalMarketData[]): Promise<SimulatedTrade[]> {
+    const trades: SimulatedTrade[] = [];
+    
+    // Look for trading opportunities in historical data
+    for (let i = 5; i < marketHistory.length - 5; i++) {
+      const currentData = marketHistory[i];
+      const recentData = marketHistory.slice(i - 5, i);
+      
+      // Create market data object for analysis
+      const marketData: MarketData = {
+        id: currentData.marketId,
+        question: currentData.question || "Historical Market",
+        yesPrice: currentData.yesPrice,
+        noPrice: currentData.noPrice,
+        volume24h: currentData.volume24h || 1000,
+        liquidity: currentData.liquidity || 5000,
+        volatility: this.calculateHistoricalVolatility(recentData),
+        lastUpdate: currentData.timestamp,
+        category: "historical",
+        endDate: currentData.endDate || Date.now() + 24 * 60 * 60 * 1000,
+      };
+      
+      // Analyze for trading signals
+      const signal = this.analyzeMarket(marketData);
+      
+      if (signal && signal.confidence > 0.7) {
+        trades.push({
+          marketId: currentData.marketId,
+          direction: signal.direction,
+          amount: Math.min(this.config.maxPositionSizeUsd, 20), // Conservative backtest size
+          entryPrice: signal.direction === "yes" ? currentData.yesPrice : currentData.noPrice,
+          timestamp: currentData.timestamp,
+          confidence: signal.confidence,
+          reasoning: signal.reasoning,
+        });
+      }
+    }
+    
+    return trades;
+  }
+  
+  private calculateHistoricalVolatility(data: HistoricalMarketData[]): number {
+    if (data.length < 2) return 0;
+    
+    const prices = data.map(d => (d.yesPrice + d.noPrice) / 2);
+    const returns = [];
+    
+    for (let i = 1; i < prices.length; i++) {
+      returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+    }
+    
+    const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+    
+    return Math.sqrt(variance);
+  }
+  
+  private calculateBacktestPnl(trade: SimulatedTrade, finalPrice: number): number {
+    // Simplified PnL calculation for backtesting
+    const priceChange = finalPrice - trade.entryPrice;
+    const multiplier = trade.direction === "yes" ? 1 : -1;
+    const pnlRatio = (priceChange * multiplier) / trade.entryPrice;
+    
+    return trade.amount * (1 + pnlRatio);
+  }
+  
+  private calculateMaxDrawdown(trades: BacktestTrade[], initialBalance: number): number {
+    let peak = initialBalance;
+    let maxDrawdown = 0;
+    let currentBalance = initialBalance;
+    
+    for (const trade of trades) {
+      currentBalance += trade.pnl;
+      
+      if (currentBalance > peak) {
+        peak = currentBalance;
+      }
+      
+      const drawdown = (peak - currentBalance) / peak;
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+    
+    return maxDrawdown * 100; // Return as percentage
+  }
+  
+  private groupByMarket(data: HistoricalMarketData[]): Map<string, HistoricalMarketData[]> {
+    const groups = new Map<string, HistoricalMarketData[]>();
+    
+    for (const item of data) {
+      if (!groups.has(item.marketId)) {
+        groups.set(item.marketId, []);
+      }
+      groups.get(item.marketId)!.push(item);
+    }
+    
+    // Sort each group by timestamp
+    for (const [marketId, history] of groups) {
+      history.sort((a, b) => a.timestamp - b.timestamp);
+    }
+    
+    return groups;
+  }
+  
+  /**
+   * Get backtest results summary
+   */
+  getBacktestResults(): BacktestResult[] {
+    return this.backtestResults;
+  }
+  
+  /**
+   * Generate backtest report
+   */
+  generateBacktestReport(summary: BacktestSummary): string {
+    return `📊 **Polymarket Backtest Report**
+
+**Period:** ${summary.startDate.toDateString()} - ${summary.endDate.toDateString()}
+**Initial Balance:** $${summary.initialBalance}
+**Final Balance:** $${summary.finalBalance.toFixed(2)}
+**Total Return:** ${summary.totalReturn.toFixed(2)}%
+
+**Trading Performance:**
+- Total Trades: ${summary.totalTrades}
+- Winning Trades: ${summary.winningTrades}
+- Losing Trades: ${summary.losingTrades}
+- Win Rate: ${summary.winRate.toFixed(1)}%
+
+**Risk Metrics:**
+- Total P&L: $${summary.totalPnl.toFixed(2)}
+- Average Win: $${summary.avgWin.toFixed(2)}
+- Average Loss: $${summary.avgLoss.toFixed(2)}
+- Max Drawdown: ${summary.maxDrawdown.toFixed(1)}%
+
+**Strategy Validation:**
+${summary.winRate > 55 ? "✅ Strategy shows positive edge" : "❌ Strategy needs improvement"}
+${summary.maxDrawdown < 20 ? "✅ Acceptable risk levels" : "⚠️ High drawdown - reduce position sizes"}
+${summary.totalTrades > 20 ? "✅ Sufficient sample size" : "⚠️ Limited sample - need more data"}`;
+  }
+
   getStatus(): string {
     this.resetDailyStatsIfNeeded();
     
@@ -318,7 +549,8 @@ export class PolymarketModule {
 - Daily Losses: $${this.dailyStats.losses}/$${this.config.maxDailyLossUsd}
 - Active Bets: ${this.activeBets.size}
 - Last Bet: ${this.lastBetTime ? new Date(this.lastBetTime).toLocaleTimeString() : "Never"}
-- Cooldown: ${this.config.cooldownMinutes} minutes`;
+- Cooldown: ${this.config.cooldownMinutes} minutes
+- Backtest Results: ${this.backtestResults.length} completed`;
   }
 }
 
@@ -337,4 +569,54 @@ interface BetResult {
   yesPrice?: number;
   noPrice?: number;
   error?: string;
+}
+
+export interface HistoricalMarketData {
+  marketId: string;
+  question?: string;
+  yesPrice: number;
+  noPrice: number;
+  volume24h?: number;
+  liquidity?: number;
+  timestamp: number;
+  endDate?: number;
+}
+
+export interface SimulatedTrade {
+  marketId: string;
+  direction: "yes" | "no";
+  amount: number;
+  entryPrice: number;
+  timestamp: number;
+  confidence: number;
+  reasoning: string;
+}
+
+export interface BacktestTrade extends SimulatedTrade {
+  outcome: "win" | "loss";
+  pnl: number;
+  finalPrice: number;
+}
+
+export interface BacktestSummary {
+  startDate: Date;
+  endDate: Date;
+  initialBalance: number;
+  finalBalance: number;
+  totalReturn: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;
+  totalPnl: number;
+  avgWin: number;
+  avgLoss: number;
+  maxDrawdown: number;
+  trades: BacktestTrade[];
+}
+
+export interface BacktestResult {
+  timestamp: number;
+  summary: BacktestSummary;
+  config: PolymarketConfig;
 }
