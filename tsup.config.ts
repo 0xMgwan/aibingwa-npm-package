@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: ["src/**/*.ts"],
   format: ["esm"],
   dts: true,
   sourcemap: true,
@@ -9,5 +9,6 @@ export default defineConfig({
   target: "esnext",
   outDir: "dist",
   splitting: false,
+  bundle: false, // Don't bundle - preserve individual modules
   external: ["@coinbase/agentkit"],
 });

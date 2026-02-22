@@ -24,7 +24,7 @@
 
 AIBINGWA is a modular, open-source AI agent framework designed for autonomous DeFi trading, analysis, autoexecution and alot more than just trading. You feed it skills. It combines:
 
-- **GPT-4o reasoning** — LLM brain that understands markets, evaluates risk, and makes trading decisions
+- **Claude Sonnet 4.6 reasoning** — Advanced LLM brain that understands markets, evaluates risk, and makes trading decisions
 - **Bankr Agent API** — Execute swaps, research tokens, deploy contracts, and more on Base
 - **x402 micropayments** — Pay-per-request API access using USDC on Base (self-sustaining model)
 - **Autonomous trading** — 24/7 market scanning, position monitoring, auto take-profit/stop-loss
@@ -39,15 +39,15 @@ Built to be imported into any Node.js project — Telegram bots, Discord bots, w
 ## Features
 
 ### 🧠 LLM Brain (AgentBrain)
-- GPT-4o powered reasoning with configurable model and system prompt
+- Claude Sonnet 4.6 powered reasoning with configurable model and system prompt
 - Per-user conversation memory with context window management
-- OpenAI function calling integration — the LLM decides which skills to use
+- Anthropic tool calling integration — the LLM decides which skills to use
 - Reflection loop — learns from interactions and improves over time
 - Survival-mode trading persona with risk management built into the prompt
 
 ### 🔧 Pluggable Skill System (SkillRegistry)
 - Register any number of custom skills with typed parameters
-- Skills auto-convert to OpenAI function calling format
+- Skills auto-convert to Anthropic tool calling format
 - Built-in categories: `wallet`, `trading`, `research`, `social`, `utility`, `defi`, `prediction`, `leverage`, `automation`, `nft`, `token_deploy`, `cross_chain`, `transfer`
 - Skills are described in the system prompt so the LLM knows what's available
 

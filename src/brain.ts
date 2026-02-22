@@ -1,28 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SkillRegistry } from "./skills.js";
-import {
-  AgentMemory,
-  loadMemory,
-  saveMemory,
-} from "./memory.js";
+import { UserProfile, ConversationMessage } from "./types";
+import { loadMemory, saveMemory, type AgentMemory } from "./memory.js";
+import { detectCredentialLeak, getSecurityWarning, TradingLimits, DEFAULT_SECURITY_CONFIG } from "./security.js";
 
-// ============================================================
-// CONVERSATION MEMORY — Per-user message history
-// ============================================================
-interface ConversationMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: number;
-}
-
-interface UserProfile {
-  chatId: string;
-  name: string;
-  preferences: string[];
-  conversationHistory: ConversationMessage[];
-  lastSeen: number;
-  interactionCount: number;
-}
 
 // ============================================================
 // AGENT BRAIN — LLM-powered reasoning engine
@@ -178,14 +159,12 @@ When asked to find opportunities or trade:
 - When user asks to redeem Polymarket → Use polymarket_redeem_enhanced with retries
 - NEVER say "I can't directly access" — you CAN via your skills. USE THEM FOR REAL EXECUTION.
 
-**CLAUDE-STYLE CREDENTIAL HANDLING**
-- Accept credentials in ANY natural format - no specific syntax required
-- Users can say: "mgwani96@gmail.com:Bombastic96" or "my email is mgwani96@gmail.com password Bombastic96" or just "mgwani96@gmail.com Bombastic96"
-- Intelligent parsing understands natural language like Claude does
-- No need for env vars - users give you credentials directly in conversation
-- Use store_credentials skill to save them securely in memory
-- Execute immediately once credentials are provided
-- If user asks to send email but no credentials stored, simply ask: "I need your Gmail credentials to send emails. Just tell me your email and password in any format."
+**SECURE CREDENTIAL HANDLING**
+- NEVER accept passwords, private keys, or API keys in chat messages
+- All credentials MUST be stored in environment variables or secure configuration
+- If user attempts to share credentials in chat, respond: "🚨 SECURITY WARNING: Never share passwords or private keys in chat. Please set credentials in environment variables instead."
+- Use environment variables: GMAIL_USER, GMAIL_PASS, TWITTER_API_KEY, etc.
+- If credentials are missing, guide user to proper secure setup, not chat sharing
 
 **LEARNING & EVOLUTION CAPABILITIES**
 - You learn from every interaction via persistent memory
@@ -277,6 +256,17 @@ Your Bankr integration gives you COMPLETE access to everything Bankr terminal ca
     user.interactionCount++;
     user.name = userName;
 
+    // Security check: detect credential leaks
+    if (detectCredentialLeak(message)) {
+      const warningResponse = getSecurityWarning();
+      user.conversationHistory.push({
+        role: "assistant",
+        content: warningResponse,
+        timestamp: Date.now(),
+      });
+      return warningResponse;
+    }
+
     user.conversationHistory.push({
       role: "user",
       content: message,
@@ -290,7 +280,7 @@ Your Bankr integration gives you COMPLETE access to everything Bankr terminal ca
     try {
       const messages: any[] = [
         { role: "system", content: this.buildSystemPrompt(user) },
-        ...user.conversationHistory.slice(-10).map(m => ({
+        ...user.conversationHistory.slice(-10).map((m: ConversationMessage) => ({
           role: m.role,
           content: m.content,
         })),

@@ -262,8 +262,6 @@ export function registerCronManagement(registry: SkillRegistry, deps: Automation
               console.error(`❌ Cron job ${name} failed:`, error);
             }
           }
-        }, {
-          scheduled: false // Don't start immediately
         });
 
         // Store the job
