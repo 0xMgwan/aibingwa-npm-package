@@ -79,10 +79,10 @@ export class AutonomousTrader {
       this.monitorPositions().catch(err => console.error("Monitor error:", err));
     }, monitorMs);
 
-    // Polymarket continuous scanning (if strategy is set)
-    if (this.polymarketStrategy) {
-      this.startPolymarketLoop();
-    }
+    // Polymarket continuous scanning DISABLED by default - requires explicit user command
+    // if (this.polymarketStrategy) {
+    //   this.startPolymarketLoop();
+    // }
   }
 
   stop(): void {
@@ -98,16 +98,16 @@ export class AutonomousTrader {
     this.polymarketStrategy = strategy;
     if (scanIntervalMin) this.polymarketScanIntervalMin = scanIntervalMin;
     
-    console.log(`🎯 Polymarket strategy set (scan every ${this.polymarketScanIntervalMin}min)`);
+    console.log(`🎯 Polymarket strategy set (manual mode)`);
     console.log(`   Strategy: ${strategy.substring(0, 100)}...`);
     
-    // Start the loop if trader is running
-    this.startPolymarketLoop();
+    // DO NOT auto-start the loop - require explicit user command
+    // this.startPolymarketLoop(); // DISABLED
     
-    // Execute immediately on first call
-    this.scanPolymarket().catch(err => console.error("Polymarket scan error:", err));
+    // DO NOT execute immediately - wait for user command
+    // this.scanPolymarket().catch(err => console.error("Polymarket scan error:", err)); // DISABLED
     
-    return `🎯 Polymarket auto-trading ACTIVATED\n\nStrategy: ${strategy.substring(0, 200)}\nScan interval: every ${this.polymarketScanIntervalMin} minutes\n\nI'll continuously scan and execute. No permissions needed. Let's go! 🚀`;
+    return `🎯 Polymarket strategy saved\n\nStrategy: ${strategy.substring(0, 200)}\n\n⚠️ Auto-trading is DISABLED by default.\n\nTo scan manually, say: "scan polymarket now"\nTo enable auto-scanning, say: "start polymarket auto-scan"`;
   }
 
   getPolymarketStrategy(): string | null {
